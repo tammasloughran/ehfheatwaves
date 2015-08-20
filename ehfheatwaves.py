@@ -1,9 +1,11 @@
 import warnings
 warnings.filterwarnings("ignore")
+import sys
 try: 
     import pandas as pd
 except ImportError:
     print "Please install pandas"
+    sys.exit()
 import numpy as np
 import datetime as dt
 from netCDF4 import Dataset
@@ -141,6 +143,7 @@ setattr(yearlyout, "author", "Tammas Loughran")
 setattr(yearlyout, "contact", "t.loughran@student.unsw.edu.au")
 setattr(yearlyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
 setattr(yearlyout, "script", "ehfheatwaves.py")
+setattr(yearlyout, "dataset", "AWAP 0.5deg")
 setattr(yearlyout, "base_period", "1961-1990")
 setattr(yearlyout, "percentile", "90th")
 otime = yearlyout.createVariable('time', 'f8', 'time', 
@@ -208,6 +211,7 @@ setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
 setattr(dailyout, "script", "ehfheatwaves.py")
 setattr(dailyout, "base_period", "1961-1990")
 setattr(dailyout, "percentile", "90th")
+setattr(dailyout, "dataset", "AWAP 0.5deg")
 otime = dailyout.createVariable('time', 'f8', 'time',
                 fill_value=-999.99)
 setattr(otime, 'units', 'day as %Y%m%d.%f')
@@ -218,7 +222,7 @@ setattr(olat, 'units', 'degrees_north')
 olon = dailyout.createVariable('lon', 'f8', 'lon')
 setattr(olon, 'Longname', 'Longitude')
 setattr(olon, 'units', 'degrees_east')
-oehf = dailyout.createVariable('oehf', 'f8', ('time','lat','lon'),
+oehf = dailyout.createVariable('ehf', 'f8', ('time','lat','lon'),
             fill_value=-999.99)
 setattr(oehf, 'Longname', 'Excess Heat Factor')
 setattr(oehf, 'units', 'degC2')
@@ -229,7 +233,6 @@ oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'),
                     fill_value=-99999)
 setattr(oends, 'Longname', 'Duration at end of heatwave')
 setattr(oends, 'units', 'days')
-setattr(HWTout, 'Longname', 'First heat wave day of the year')
 time[:] = time
 olat[:] = lats
 olon[:] = lons
