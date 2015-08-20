@@ -227,10 +227,10 @@ oehf = dailyout.createVariable('ehf', 'f8', ('time','lat','lon'),
             fill_value=-999.99)
 setattr(oehf, 'Longname', 'Excess Heat Factor')
 setattr(oehf, 'units', 'degC2')
-oevent = dailyout.createVariable('event', 'f8', ('time','lat','lon'),
+oevent = dailyout.createVariable('event', 'i8', ('time','lat','lon'),
             fill_value=-99999)
 setattr(oehf, 'Longname', 'Event indicator')
-oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'),
+oends = dailyout.createVariable('ends', 'i8', ('time','lat','lon'),
                     fill_value=-99999)
 setattr(oends, 'Longname', 'Duration at end of heatwave')
 setattr(oends, 'units', 'days')
