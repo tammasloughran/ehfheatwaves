@@ -41,6 +41,7 @@ dates = pd.date_range(start,end)
 
 # Cut out base period
 tave = tave[(dates.month!=2)|(dates.day!=29),...]
+time = time[(dates.month!=2)|(dates.day!=29)]
 dates = dates[(dates.month!=2)|(dates.day!=29)]
 base = ((1961<=dates.year)&(dates.year<=1990))
 tave_base = tave[base,...]
@@ -202,7 +203,7 @@ HWTout[:]=HWT[:]
 yearlyout.close()
 
 dailyout = Dataset('EHF_heatwaves_1911-2014_daily.nc', mode='w')
-dailyout.createDimension('time', EHF.shape[0])
+dailyout.createDimension('time', len(time))
 dailyout.createDimension('lon', len(lons))
 dailyout.createDimension('lat', len(lats))
 setattr(dailyout, "author", "Tammas Loughran")
@@ -233,7 +234,7 @@ oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'),
                     fill_value=-99999)
 setattr(oends, 'Longname', 'Duration at end of heatwave')
 setattr(oends, 'units', 'days')
-time[:] = time
+otime[:] = time
 olat[:] = lats
 olon[:] = lons
 oehf[:] = EHF
