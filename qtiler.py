@@ -133,7 +133,7 @@ def quantile_zhang(y, p, fraction=False, rmnans=False):
     y = y.flatten()
     if (np.isnan(np.min(y)))&(rmnans==True):
         y = y[np.logical_not(np.isnan(y))]
-    elif (np.isnan(np.min(y)))&(rmnans==False)
+    elif (np.isnan(np.min(y)))&(rmnans==False):
         raise Exception('You must not have nans in percentile calculation')
     n = len(y)
     # j is the largest integer no greater than (p*(n+1))
