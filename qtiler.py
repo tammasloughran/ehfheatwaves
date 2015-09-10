@@ -130,24 +130,77 @@ def quantile_zhang(y, p, fraction=False, rmnans=False):
     if not fraction:
         p = p/100.
     # Flatten array
-    y = y.flatten()
+    #y = y.flatten()
     if (np.isnan(np.min(y)))&(rmnans==True):
         y = y[np.logical_not(np.isnan(y))]
     elif (np.isnan(np.min(y)))&(rmnans==False):
         raise Exception('You must not have nans in percentile calculation')
-    n = len(y)
+    n = y.shape[0]
     # j is the largest integer no greater than (p*(n+1))
     j = math.floor(p*(n+1))
     # f is the interpolation factor
     f = p*(n+1) - j
-    # Sort the array
-    y = np.sort(y)
-    if j>=n:
-        Qp = y[-1]
-    elif j<1:
-        Qp = y[0]
+    if y.ndim==3:
+        Qp = np.ones((y.shape[1],y.shape[2]))*np.nan
+        for lat in range(y.shape[1]):
+            for lon in range(y.shape[2]):
+                # Sort the array
+                array = np.sort(y[:,lat,lon])
+                if j>=n:
+                    Qp[lat,lon] = array[-1]
+                elif j<1:
+                    Qp[lat,lon] = array[0]
+                else:
+                    yj = array[j-1]
+                    yjp = array[j]
+                    Qp[lat,lon] = (1-f)*yj + f*yjp
     else:
-        yj = y[j-1]
-        yjp = y[j]
-        Qp = (1-f)*yj + f*yjp
+        y = np.sort(y)
+        if j>=n:
+            Qp = y[-1]
+        elif j<1:
+            Qp = y[0]
+        else:
+            yj = y[j-1]
+            yjp = y[j]
+            Qp = (1-f)*yj + f*yjp
+    return Qp
+
+def quantile_climpact(y,p,fraction=False):
+    import numpy as np
+    import math
+    import sys
+    if not fraction:
+        p = p/100.
+    n = y.shape[0]
+    a, b = 1.0/3.0, 1.0/3.0
+    nppm = a + p*(n + 1 - a - b) - 1
+    fuzz = 4*sys.float_info.epsilon
+    j = math.floor(nppm + fuzz)
+    if (abs(nppm - j)<=fuzz):
+        h = 0
+    else:
+        h = nppm - j
+    right_elem = max(0, min(int(j) + 1, n - 1))
+    left_elem = max(0, min(int(j), n - 1))
+    if y.ndim==3:
+        Qp = np.ones((y.shape[1],y.shape[2]))*np.nan
+        for lat in range(y.shape[1]):
+            for lon in range(y.shape[2]):
+                # Sort the array
+                array = np.sort(y[:,lat,lon])
+                if h==1:
+                    Qp[lat,lon] = array[right_elem]
+                elif h==0:
+                    Qp[lat,lon] = array[left_elem]
+                else:
+                    Qp[lat,lon] = ((1 - h)*array[left_elem] + h*array[right_elem])
+    else:
+        y = np.sort(y)
+        if h==1:
+            Qp = y[right_elem]
+        elif h==0:
+            Qp = y[left_elem]
+        else:
+            Qp = (1 - h)*y[left_elem] + h*y[right_elem]
     return Qp

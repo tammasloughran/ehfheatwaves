@@ -8,7 +8,11 @@ except ImportError:
     sys.exit()
 import numpy as np
 import datetime as dt
+import qtiler
 from netCDF4 import Dataset
+
+# climpact/python/matlab
+qtilemethod = 'climpact'
 
 # Load data
 tmax_fname = ('/srv/ccrc/data35/z5032520/AWAP/daily/tmax/'
@@ -53,12 +57,20 @@ wsize = 15.
 window[-np.floor(wsize/2.):] = 1
 window[:np.ceil(wsize/2.)] = 1
 window = np.tile(window,30)
+if qtilemethod=='python':
+    percentile = np.percentile
+    parameter = 0
+elif qtilemethod=='zhang':
+    percentile = qtiler.quantile_zhang
+    parameter = False
+elif qtilemethod=='matlab':
+    percentile = qtiler.quantile_R
+    parameter = 5
+elif qtilemethod=='climpact':
+    percentile = qtiler.quantile_climpact
+    parameter = False
 for day in range(365):
-    tpct[day,...] = np.percentile(
-            tave_base[window,...],
-            90,
-            axis=0,
-            interpolation='midpoint')
+    tpct[day,...] = percentile(tave_base[window,...], 90, parameter)
     window = np.roll(window,1)
 del tave_base
 del window
@@ -101,24 +113,27 @@ HWD = HWN.copy()
 HWA = HWN.copy()
 HWM = HWN.copy()
 HWT = HWN.copy()
+seasonlen = 151
 for iyear, year in enumerate(range(syear,eyear)):
     HWMtmp = np.ones((365,tave.shape[1],tave.shape[2]))*np.nan
     # Select winter heatwaves
-    season = ((dates.year==year)&((dates.month==5)|
-            (dates.month==6)|(dates.month==7)|
-            (dates.month==8)|(dates.month==9)))
-    EHF_i = EHF[season,...]
-    event_i = event[season,...]
-    duration_i = ends[season,...].astype(np.float)
-
+    #season = ((dates.year==year)&((dates.month==1)|
+    #        (dates.month==2)|(dates.month==3)|
+    #        (dates.month==11)|(dates.month==12)))
+    ione = 304+365*iyear
+    itwo = 455+365*iyear
+    if year==2014: continue
+    EHF_i = EHF[ione:itwo,...]
+    event_i = event[ione:itwo,...]
+    duration_i = ends[ione:itwo,...].astype(np.float)
     # Calculate metrics
     HWN[iyear,...] = (duration_i>0).sum(axis=0)
-    HWF[iyear,...] = duration_i.sum(axis=0)/float(len(season))
+    HWF[iyear,...] = 100*duration_i.sum(axis=0)/float(seasonlen)
     HWD[iyear,...] = duration_i.max(axis=0)
     HWA[iyear,...] = EHF_i.max(axis=0)
     HWMtmp[event_i==True] = EHF_i[event_i==True]
     HWM[iyear,...] = np.nanmean(HWMtmp, axis=0)
-    HWT[iyear,...] = np.argmax(event_i,axis=0)+1 
+    HWT[iyear,...] = np.argmax(event_i,axis=0)+1
 
 # Mask the data
 masknc = Dataset(
@@ -136,7 +151,7 @@ event[:,mask==False] = -99999
 ends[:,mask==False] = -99999
 
 # Save to netCDF
-yearlyout = Dataset('EHF_heatwaves_1911-2014_winter.nc', mode='w')
+yearlyout = Dataset('EHF_heatwaves_1911-2014_summer_climpact.nc', mode='w')
 yearlyout.createDimension('time', len(range(syear,eyear)))
 yearlyout.createDimension('lon', len(lons))
 yearlyout.createDimension('lat', len(lats))
@@ -203,42 +218,44 @@ HWDout[:]=HWD[:]
 HWTout[:]=HWT[:]
 yearlyout.close()
 
-dailyout = Dataset('EHF_heatwaves_1911-2014_daily.nc', mode='w')
-dailyout.createDimension('time', len(time))
-dailyout.createDimension('lon', len(lons))
-dailyout.createDimension('lat', len(lats))
-setattr(dailyout, "author", "Tammas Loughran")
-setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
-setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
-setattr(dailyout, "script", "ehfheatwaves.py")
-setattr(dailyout, "base_period", "1961-1990")
-setattr(dailyout, "percentile", "90th")
-setattr(dailyout, "dataset", "AWAP 0.5deg")
-otime = dailyout.createVariable('time', 'f8', 'time',
+dailyout = False
+if dailyout==True:
+    dailyout = Dataset('EHF_heatwaves_1911-2014_daily.nc', mode='w')
+    dailyout.createDimension('time', len(time))
+    dailyout.createDimension('lon', len(lons))
+    dailyout.createDimension('lat', len(lats))
+    setattr(dailyout, "author", "Tammas Loughran")
+    setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
+    setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
+    setattr(dailyout, "script", "ehfheatwaves.py")
+    setattr(dailyout, "base_period", "1961-1990")
+    setattr(dailyout, "percentile", "90th")
+    setattr(dailyout, "dataset", "AWAP 0.5deg")
+    otime = dailyout.createVariable('time', 'f8', 'time',
+                    fill_value=-999.99)
+    setattr(otime, 'units', 'day as %Y%m%d.%f')
+    setattr(otime, 'calendar', 'proleptic_gregorian')
+    olat = dailyout.createVariable('lat', 'f8', 'lat')
+    setattr(olat, 'Longname', 'Latitude')
+    setattr(olat, 'units', 'degrees_north') 
+    olon = dailyout.createVariable('lon', 'f8', 'lon')
+    setattr(olon, 'Longname', 'Longitude')
+    setattr(olon, 'units', 'degrees_east')
+    oehf = dailyout.createVariable('ehf', 'f8', ('time','lat','lon'),
                 fill_value=-999.99)
-setattr(otime, 'units', 'day as %Y%m%d.%f')
-setattr(otime, 'calendar', 'proleptic_gregorian')
-olat = dailyout.createVariable('lat', 'f8', 'lat')
-setattr(olat, 'Longname', 'Latitude')
-setattr(olat, 'units', 'degrees_north') 
-olon = dailyout.createVariable('lon', 'f8', 'lon')
-setattr(olon, 'Longname', 'Longitude')
-setattr(olon, 'units', 'degrees_east')
-oehf = dailyout.createVariable('ehf', 'f8', ('time','lat','lon'),
-            fill_value=-999.99)
-setattr(oehf, 'Longname', 'Excess Heat Factor')
-setattr(oehf, 'units', 'degC2')
-oevent = dailyout.createVariable('event', 'i8', ('time','lat','lon'),
-            fill_value=-99999)
-setattr(oehf, 'Longname', 'Event indicator')
-oends = dailyout.createVariable('ends', 'i8', ('time','lat','lon'),
-                    fill_value=-99999)
-setattr(oends, 'Longname', 'Duration at end of heatwave')
-setattr(oends, 'units', 'days')
-otime[:] = time
-olat[:] = lats
-olon[:] = lons
-oehf[:] = EHF
-oevent[:] = event
-oends[:] = ends
-dailyout.close()
+    setattr(oehf, 'Longname', 'Excess Heat Factor')
+    setattr(oehf, 'units', 'degC2')
+    oevent = dailyout.createVariable('event', 'i8', ('time','lat','lon'),
+                fill_value=-99999)
+    setattr(oehf, 'Longname', 'Event indicator')
+    oends = dailyout.createVariable('ends', 'i8', ('time','lat','lon'),
+                        fill_value=-99999)
+    setattr(oends, 'Longname', 'Duration at end of heatwave')
+    setattr(oends, 'units', 'days')
+    otime[:] = time
+    olat[:] = lats
+    olon[:] = lons
+    oehf[:] = EHF
+    oevent[:] = event
+    oends[:] = ends
+    dailyout.close()
