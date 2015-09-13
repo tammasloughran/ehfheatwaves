@@ -140,33 +140,37 @@ def quantile_zhang(y, p, fraction=False, rmnans=False):
     j = math.floor(p*(n+1))
     # f is the interpolation factor
     f = p*(n+1) - j
-    if y.ndim==3:
-        Qp = np.ones((y.shape[1],y.shape[2]))*np.nan
-        for lat in range(y.shape[1]):
-            for lon in range(y.shape[2]):
-                # Sort the array
-                array = np.sort(y[:,lat,lon])
-                if j>=n:
-                    Qp[lat,lon] = array[-1]
-                elif j<1:
-                    Qp[lat,lon] = array[0]
-                else:
-                    yj = array[j-1]
-                    yjp = array[j]
-                    Qp[lat,lon] = (1-f)*yj + f*yjp
-    else:
-        y = np.sort(y)
+
+    def intrpl(y,j):
         if j>=n:
-            Qp = y[-1]
+            return y[-1]
         elif j<1:
-            Qp = y[0]
+            return y[0]
         else:
             yj = y[j-1]
             yjp = y[j]
-            Qp = (1-f)*yj + f*yjp
+            return (1-f)*yj + f*yjp
+
+    if y.ndim==1:
+        y = np.sort(y)
+        Qp = intrpl(y,j)
+    else:
+        spacedim = np.array(y.shape)[1:].prod()
+        oldshape = y.shape[1:]
+        y = y.reshape(y.shape[0], spacedim)
+        Qp = np.ones(spacedim)*np.nan
+        for lat in range(spacedim):
+            array = np.sort(y[:,lat])
+            Qp[lat] = intrpl(y,j)
+        Qp = Qp.reshape(oldshape)
     return Qp
 
 def quantile_climpact(y,p,fraction=False):
+    """quantile function used by climpact.
+
+    Copy of the c_quantile function unsed in climpact.
+    I have no idea where the interpolation is from.
+    """
     import numpy as np
     import math
     import sys
@@ -183,24 +187,25 @@ def quantile_climpact(y,p,fraction=False):
         h = nppm - j
     right_elem = max(0, min(int(j) + 1, n - 1))
     left_elem = max(0, min(int(j), n - 1))
-    if y.ndim==3:
-        Qp = np.ones((y.shape[1],y.shape[2]))*np.nan
-        for lat in range(y.shape[1]):
-            for lon in range(y.shape[2]):
-                # Sort the array
-                array = np.sort(y[:,lat,lon])
-                if h==1:
-                    Qp[lat,lon] = array[right_elem]
-                elif h==0:
-                    Qp[lat,lon] = array[left_elem]
-                else:
-                    Qp[lat,lon] = ((1 - h)*array[left_elem] + h*array[right_elem])
-    else:
-        y = np.sort(y)
+
+    def intrpl(left,right,h):
         if h==1:
-            Qp = y[right_elem]
+            return right
         elif h==0:
-            Qp = y[left_elem]
+            return left
         else:
-            Qp = (1 - h)*y[left_elem] + h*y[right_elem]
+            return (1 - h)*left + h*right
+
+    if y.ndim==1:
+        y = np.sort(y)
+        Qp = intrpl(y[left_elem],y[right_elem],h)
+    else:
+        spacedim = np.array(y.shape)[1:].prod()
+        oldshape = y.shape[1:]
+        y = y.reshape(y.shape[0], spacedim)
+        Qp = np.ones(spacedim)*np.nan
+        for lat in range(spacedim):
+            array = np.sort(y[:,lat])
+            Qp[lat] = intrpl(array[left_elem],array[right_elem],h)
+        Qp = Qp.reshape(oldshape)
     return Qp

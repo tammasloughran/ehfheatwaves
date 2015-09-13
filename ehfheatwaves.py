@@ -13,6 +13,14 @@ from netCDF4 import Dataset
 
 # climpact/python/matlab
 qtilemethod = 'climpact'
+# season (winter/summer)
+season = 'winter'
+# save daily EHF output
+dailyout = True
+# base period
+bpstart = 1961
+bpend = 1990
+
 
 # Load data
 tmax_fname = ('/srv/ccrc/data35/z5032520/AWAP/daily/tmax/'
@@ -47,11 +55,11 @@ dates = pd.date_range(start,end)
 tave = tave[(dates.month!=2)|(dates.day!=29),...]
 time = time[(dates.month!=2)|(dates.day!=29)]
 dates = dates[(dates.month!=2)|(dates.day!=29)]
-base = ((1961<=dates.year)&(dates.year<=1990))
+base = ((bpstart<=dates.year)&(dates.year<=bpend))
 tave_base = tave[base,...]
 
 # Caclulate 90th percentile
-tpct = np.ones((365,tave_base.shape[-2],tave_base.shape[-1]))
+tpct = np.ones((365,tave_base.shape[-2],tave_base.shape[-1]))*np.nan
 window = np.zeros(365,dtype=np.bool)
 wsize = 15.
 window[-np.floor(wsize/2.):] = 1
@@ -87,14 +95,20 @@ for i in range(tave.shape[0]):
 EHF[EHF<0] = 0
 
 # Agregate consecutive days with EHF>0
+# First day contains duration
 event = (EHF>0.).astype(np.int)
-for i in range(1,event.shape[0]):
-    event[i,event[i,...]>0] = event[i-1,event[i,...]>0]+1
+for i in range(event.shape[0]-2,0,-1):
+    event[i,event[i,...]>0] = event[i+1,event[i,...]>0]+1
+# Last day contains duration.
+#for i in range(1,event.shape[0]):
+#    event[i,event[i,...]>0] = event[i-1,event[i,...]>0]+1
 
 # Identify when heatwaves terminate with duration
-diff = np.diff(event, axis=0)
+# Given that first day contains duration
+diff = np.zeros(event.shape)
+diff[1:,...] = np.diff(event, axis=0)
 ends = np.zeros(tave.shape,dtype=np.int)
-ends[diff<0] = event[diff<0]
+ends[diff>2] = event[diff>2]
 del diff
 
 # Remove events less than 3 days
@@ -113,19 +127,24 @@ HWD = HWN.copy()
 HWA = HWN.copy()
 HWM = HWN.copy()
 HWT = HWN.copy()
-seasonlen = 151
 for iyear, year in enumerate(range(syear,eyear)):
+    if year==2014: continue 
     HWMtmp = np.ones((365,tave.shape[1],tave.shape[2]))*np.nan
-    # Select winter heatwaves
-    #season = ((dates.year==year)&((dates.month==1)|
-    #        (dates.month==2)|(dates.month==3)|
-    #        (dates.month==11)|(dates.month==12)))
-    ione = 304+365*iyear
-    itwo = 455+365*iyear
-    if year==2014: continue
-    EHF_i = EHF[ione:itwo,...]
-    event_i = event[ione:itwo,...]
-    duration_i = ends[ione:itwo,...].astype(np.float)
+    if season=='summer':
+        seasonlen = 151
+        ione = 304+365*iyear
+        itwo = 455+365*iyear
+        EHF_i = EHF[ione:itwo,...]
+        event_i = event[ione:itwo,...]
+        duration_i = ends[ione:itwo,...].astype(np.float)
+    elif season=='winter':
+        seasonlen = 153
+        season = ((dates.year==year)&((dates.month==5)|
+            (dates.month==6)|(dates.month==7)|
+            (dates.month==8)|(dates.month==9)))
+        EHF_i = EHF[season,...]
+        event_i = event[season,...]
+        duration_i = ends[season,...].astype(np.float)
     # Calculate metrics
     HWN[iyear,...] = (duration_i>0).sum(axis=0)
     HWF[iyear,...] = 100*duration_i.sum(axis=0)/float(seasonlen)
@@ -151,7 +170,7 @@ event[:,mask==False] = -99999
 ends[:,mask==False] = -99999
 
 # Save to netCDF
-yearlyout = Dataset('EHF_heatwaves_1911-2014_summer_climpact.nc', mode='w')
+yearlyout = Dataset('EHF_heatwaves_1911-2014_winter_climpact.nc', mode='w')
 yearlyout.createDimension('time', len(range(syear,eyear)))
 yearlyout.createDimension('lon', len(lons))
 yearlyout.createDimension('lat', len(lats))
@@ -218,7 +237,6 @@ HWDout[:]=HWD[:]
 HWTout[:]=HWT[:]
 yearlyout.close()
 
-dailyout = False
 if dailyout==True:
     dailyout = Dataset('EHF_heatwaves_1911-2014_daily.nc', mode='w')
     dailyout.createDimension('time', len(time))
