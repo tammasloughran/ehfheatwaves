@@ -14,7 +14,7 @@ from netCDF4 import Dataset
 # climpact/python/matlab
 qtilemethod = 'climpact'
 # season (winter/summer)
-season = 'winter'
+season = 'summer'
 # save daily EHF output
 dailyout = True
 yearlyout = True
@@ -147,7 +147,7 @@ else:
     startday = 304
     endday = 455
 for iyear, year in enumerate(xrange(syear,eyear)):
-    if (year==endyear)&(season=='summer'): continue 
+    if (year==eyear)&(season=='summer'): continue 
     HWMtmp = np.ones((daysinyear,tave.shape[1]))*np.nan
     ifrom = startday+daysinyear*iyear
     ito = endday+daysinyear*iyear
@@ -175,7 +175,7 @@ if yearlyout:
     setattr(yearlyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(yearlyout, "script", "ehfheatwaves.py")
     setattr(yearlyout, "dataset", "AWAP 0.5deg")
-    setattr(yearlyout, "base_period", "%s-%s"%(str(bpstart),str(bpend))
+    setattr(yearlyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(yearlyout, "percentile", "%sth"%(str(pcntl)))
     otime = yearlyout.createVariable('time', 'f8', 'time', 
             fill_value=-999.99)
@@ -251,7 +251,7 @@ if dailyout:
     setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
     setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(dailyout, "script", "ehfheatwaves.py")
-    setattr(dailyout, "base_period", "%s-%s"%(str(bpstart),str(bpend))
+    setattr(dailyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(dailyout, "percentile", "%sth"%(str(pcntl)))
     setattr(dailyout, "dataset", "AWAP 0.5deg")
     otime = dailyout.createVariable('time', 'f8', 'time',
