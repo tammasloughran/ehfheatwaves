@@ -22,6 +22,8 @@ yearlyout = True
 bpstart = 1961
 bpend = 1990
 daysinyear = 365
+# percentile
+pcntl = 90
 
 # Load data
 tmax_fname = ('/srv/ccrc/data35/z5032520/AWAP/daily/tmax/'
@@ -87,7 +89,7 @@ elif qtilemethod=='climpact':
     percentile = qtiler.quantile_climpact
     parameter = False
 for day in xrange(daysinyear):
-    tpct[day,...] = percentile(tave_base[window,...], 90, parameter)
+    tpct[day,...] = percentile(tave_base[window,...], pcntl, parameter)
     window = np.roll(window,1)
 del tave_base
 del window
@@ -122,7 +124,7 @@ del diff
 
 # Remove events less than 3 days
 event[ends==2] = 0
-event[np.roll(ends==2,-1,axis=0)] = 0
+event[np.roll(ends==2, 1, axis=0)] = 0
 event[ends==1] = 0
 event[event>0] = 1
 event = event.astype(np.bool)
@@ -145,7 +147,7 @@ else:
     startday = 304
     endday = 455
 for iyear, year in enumerate(xrange(syear,eyear)):
-    if year==2014: continue 
+    if (year==endyear)&(season=='summer'): continue 
     HWMtmp = np.ones((daysinyear,tave.shape[1]))*np.nan
     ifrom = startday+daysinyear*iyear
     ito = endday+daysinyear*iyear
@@ -163,7 +165,7 @@ for iyear, year in enumerate(xrange(syear,eyear)):
 
 if yearlyout:
     # Save to netCDF
-    yearlyout = Dataset('EHF_heatwaves_1911-2014_winter_climpact.nc', mode='w')
+    yearlyout = Dataset('EHF_heatwaves_1911-2014_yearly_%s.nc'%(season), mode='w')
     yearlyout.createDimension('time', len(range(syear,eyear)))
     yearlyout.createDimension('lon', len(lons))
     yearlyout.createDimension('lat', len(lats))
@@ -173,8 +175,8 @@ if yearlyout:
     setattr(yearlyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(yearlyout, "script", "ehfheatwaves.py")
     setattr(yearlyout, "dataset", "AWAP 0.5deg")
-    setattr(yearlyout, "base_period", "1961-1990")
-    setattr(yearlyout, "percentile", "90th")
+    setattr(yearlyout, "base_period", "%s-%s"%(str(bpstart),str(bpend))
+    setattr(yearlyout, "percentile", "%sth"%(str(pcntl)))
     otime = yearlyout.createVariable('time', 'f8', 'time', 
             fill_value=-999.99)
     setattr(otime, 'units', 'year')
@@ -184,11 +186,12 @@ if yearlyout:
     olon = yearlyout.createVariable('lon', 'f8', 'lon')
     setattr(olon, 'Longname', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
-    otpct = yearlyout.createVariable('t90pct', 'f8', ('day','lat','lon'), 
+    otpct = yearlyout.createVariable('t%spct'%(pcntl), 'f8', ('day','lat','lon'), 
             fill_value=-999.99)
     setattr(otpct, 'Longname', '90th percentile')
     setattr(otpct, 'units', 'degC')
-    setattr(otpct, 'description', '90th percentile of 1961-1990')
+    setattr(otpct, 'description', 
+            '90th percentile of %s-%s'%(str(bpstart),str(bpend)))
     HWAout = yearlyout.createVariable('HWA_EHF', 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
     setattr(HWAout, 'Longname', 'Peak of the hottest heatwave per year')
@@ -248,8 +251,8 @@ if dailyout:
     setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
     setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(dailyout, "script", "ehfheatwaves.py")
-    setattr(dailyout, "base_period", "1961-1990")
-    setattr(dailyout, "percentile", "90th")
+    setattr(dailyout, "base_period", "%s-%s"%(str(bpstart),str(bpend))
+    setattr(dailyout, "percentile", "%sth"%(str(pcntl)))
     setattr(dailyout, "dataset", "AWAP 0.5deg")
     otime = dailyout.createVariable('time', 'f8', 'time',
                     fill_value=-999.99)
