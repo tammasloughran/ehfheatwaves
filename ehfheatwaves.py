@@ -17,10 +17,11 @@ qtilemethod = 'climpact'
 season = 'winter'
 # save daily EHF output
 dailyout = True
+yearlyout = True
 # base period
 bpstart = 1961
 bpend = 1990
-
+daysinyear = 365
 
 # Load data
 tmax_fname = ('/srv/ccrc/data35/z5032520/AWAP/daily/tmax/'
@@ -33,6 +34,14 @@ tmaxnc.close()
 tminnc = Dataset(tmin_fname)
 tmin = tminnc.variables['tmin'][:]
 tave = (tmax + tmin)/2
+# Mask the data
+masknc = Dataset(
+            '/srv/ccrc/data35/z5032520/AWAP/mask/AWAP_Land-Sea-Mask_0.5deg.nc')
+mask = masknc.variables['LSM'][:]
+mask = mask.astype(np.bool)
+masknc.close()
+original_shape = tave.shape
+tave = tave[...,mask]
 del tmin
 del tmax
 time = tminnc.variables['time'][:]
@@ -59,8 +68,8 @@ base = ((bpstart<=dates.year)&(dates.year<=bpend))
 tave_base = tave[base,...]
 
 # Caclulate 90th percentile
-tpct = np.ones((365,tave_base.shape[-2],tave_base.shape[-1]))*np.nan
-window = np.zeros(365,dtype=np.bool)
+tpct = np.ones((daysinyear,tave_base.shape[1]))*np.nan
+window = np.zeros(daysinyear,dtype=np.bool)
 wsize = 15.
 window[-np.floor(wsize/2.):] = 1
 window[:np.ceil(wsize/2.)] = 1
@@ -77,7 +86,7 @@ elif qtilemethod=='matlab':
 elif qtilemethod=='climpact':
     percentile = qtiler.quantile_climpact
     parameter = False
-for day in range(365):
+for day in xrange(daysinyear):
     tpct[day,...] = percentile(tave_base[window,...], 90, parameter)
     window = np.roll(window,1)
 del tave_base
@@ -85,7 +94,7 @@ del window
 
 # Calculate EHF
 EHF = np.ones(tave.shape)*np.nan
-for i in range(tave.shape[0]):
+for i in xrange(tave.shape[0]):
     if i<31: continue
     EHIaccl = tave[i-2:i+1,...].sum(axis=0)/3. - \
             tave[i-32:i-2,...].sum(axis=0)/30.
@@ -97,13 +106,13 @@ EHF[EHF<0] = 0
 # Agregate consecutive days with EHF>0
 # First day contains duration
 event = (EHF>0.).astype(np.int)
-for i in range(event.shape[0]-2,0,-1):
+for i in xrange(event.shape[0]-2,0,-1):
     event[i,event[i,...]>0] = event[i+1,event[i,...]>0]+1
 # Last day contains duration.
 #for i in range(1,event.shape[0]):
 #    event[i,event[i,...]>0] = event[i-1,event[i,...]>0]+1
 
-# Identify when heatwaves terminate with duration
+# Identify when heatwaves start with duration
 # Given that first day contains duration
 diff = np.zeros(event.shape)
 diff[1:,...] = np.diff(event, axis=0)
@@ -121,30 +130,28 @@ ends[ends<3] = 0
 
 # Calculate metrics year by year
 nyears = len(range(syear,eyear))
-HWN = np.ones((nyears,tave.shape[1],tave.shape[2]))*np.nan
+HWN = np.ones((nyears,tave.shape[1]))*np.nan
 HWF = HWN.copy()
 HWD = HWN.copy()
 HWA = HWN.copy()
 HWM = HWN.copy()
 HWT = HWN.copy()
-for iyear, year in enumerate(range(syear,eyear)):
+if season=='winter':
+    seasonlen = 153
+    startday = 121
+    endday = 274
+else:
+    seasonlen = 151
+    startday = 304
+    endday = 455
+for iyear, year in enumerate(xrange(syear,eyear)):
     if year==2014: continue 
-    HWMtmp = np.ones((365,tave.shape[1],tave.shape[2]))*np.nan
-    if season=='summer':
-        seasonlen = 151
-        ione = 304+365*iyear
-        itwo = 455+365*iyear
-        EHF_i = EHF[ione:itwo,...]
-        event_i = event[ione:itwo,...]
-        duration_i = ends[ione:itwo,...].astype(np.float)
-    elif season=='winter':
-        seasonlen = 153
-        season = ((dates.year==year)&((dates.month==5)|
-            (dates.month==6)|(dates.month==7)|
-            (dates.month==8)|(dates.month==9)))
-        EHF_i = EHF[season,...]
-        event_i = event[season,...]
-        duration_i = ends[season,...].astype(np.float)
+    HWMtmp = np.ones((daysinyear,tave.shape[1]))*np.nan
+    ifrom = startday+daysinyear*iyear
+    ito = endday+daysinyear*iyear
+    EHF_i = EHF[ifrom:ito,...]
+    event_i = event[ifrom:ito,...]
+    duration_i = ends[ifrom:ito,...].astype(np.float)
     # Calculate metrics
     HWN[iyear,...] = (duration_i>0).sum(axis=0)
     HWF[iyear,...] = 100*duration_i.sum(axis=0)/float(seasonlen)
@@ -152,92 +159,87 @@ for iyear, year in enumerate(range(syear,eyear)):
     HWA[iyear,...] = EHF_i.max(axis=0)
     HWMtmp[event_i==True] = EHF_i[event_i==True]
     HWM[iyear,...] = np.nanmean(HWMtmp, axis=0)
-    HWT[iyear,...] = np.argmax(event_i,axis=0)+1
+    HWT[iyear,...] = np.argmax(event_i,axis=0)
 
-# Mask the data
-masknc = Dataset(
-    '/srv/ccrc/data35/z5032520/AWAP/mask/AWAP_Land-Sea-Mask_0.5deg.nc')
-mask = masknc.variables['LSM'][:]
-masknc.close()
-HWN[:,mask==False] = np.nan
-HWF[:,mask==False] = np.nan
-HWD[:,mask==False] = np.nan
-HWA[:,mask==False] = np.nan
-HWM[:,mask==False] = np.nan
-HWT[:,mask==False] = np.nan
-EHF[:,mask==False] = np.nan
-event[:,mask==False] = -99999
-ends[:,mask==False] = -99999
+if yearlyout:
+    # Save to netCDF
+    yearlyout = Dataset('EHF_heatwaves_1911-2014_winter_climpact.nc', mode='w')
+    yearlyout.createDimension('time', len(range(syear,eyear)))
+    yearlyout.createDimension('lon', len(lons))
+    yearlyout.createDimension('lat', len(lats))
+    yearlyout.createDimension('day', daysinyear)
+    setattr(yearlyout, "author", "Tammas Loughran")
+    setattr(yearlyout, "contact", "t.loughran@student.unsw.edu.au")
+    setattr(yearlyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
+    setattr(yearlyout, "script", "ehfheatwaves.py")
+    setattr(yearlyout, "dataset", "AWAP 0.5deg")
+    setattr(yearlyout, "base_period", "1961-1990")
+    setattr(yearlyout, "percentile", "90th")
+    otime = yearlyout.createVariable('time', 'f8', 'time', 
+            fill_value=-999.99)
+    setattr(otime, 'units', 'year')
+    olat = yearlyout.createVariable('lat', 'f8', 'lat')
+    setattr(olat, 'Longname', 'Latitude')
+    setattr(olat, 'units', 'degrees_north')
+    olon = yearlyout.createVariable('lon', 'f8', 'lon')
+    setattr(olon, 'Longname', 'Longitude')
+    setattr(olon, 'units', 'degrees_east')
+    otpct = yearlyout.createVariable('t90pct', 'f8', ('day','lat','lon'), 
+            fill_value=-999.99)
+    setattr(otpct, 'Longname', '90th percentile')
+    setattr(otpct, 'units', 'degC')
+    setattr(otpct, 'description', '90th percentile of 1961-1990')
+    HWAout = yearlyout.createVariable('HWA_EHF', 'f8', ('time','lat','lon'), 
+            fill_value=-999.99)
+    setattr(HWAout, 'Longname', 'Peak of the hottest heatwave per year')
+    setattr(HWAout, 'units', 'degC2')
+    setattr(HWAout, 'description', 
+            'Peak of the hottest heatwave per year')
+    HWMout = yearlyout.createVariable('HWM_EHF', 'f8', ('time','lat','lon'),
+            fill_value=-999.99)
+    setattr(HWMout, 'Longname', 'Average magnitude of the yearly heatwave')
+    setattr(HWMout, 'units', 'degC2')
+    setattr(HWMout, 'description', 'Average magnitude of the yearly heatwave')
+    HWNout = yearlyout.createVariable('HWN_EHF', 'f8', ('time', 'lat', 'lon'), 
+            fill_value=-999.99)
+    setattr(HWNout, 'Longname', 'Number of heatwaves')
+    setattr(HWNout, 'units','')
+    setattr(HWNout, 'description', 'Number of heatwaves per year')
+    HWFout = yearlyout.createVariable('HWF_EHF', 'f8', ('time','lat','lon'), 
+            fill_value=-999.99)
+    setattr(HWFout,'Longname','Number of heatwave days')
+    setattr(HWFout, 'units', '%')
+    setattr(HWFout, 'description', 'Proportion of heatwave days per season')
+    HWDout = yearlyout.createVariable('HWD_EHF', 'f8', ('time','lat','lon'), 
+            fill_value=-999.99)
+    setattr(HWDout, 'Longname', 'Duration of yearly longest heatwave')
+    setattr(HWDout, 'units', 'days')
+    setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
+    HWTout = yearlyout.createVariable('HWT_EHF', 'f8', ('time','lat','lon'), 
+            fill_value=-999.99)
+    setattr(HWTout, 'Longname', 'First heat wave day of the year')
+    otime[:] = range(syear, eyear)
+    olat[:] = lats
+    olon[:] = lons
+    dummy_array = np.ones((daysinyear,)+original_shape[1:])*np.nan
+    dummy_array[:,mask] = tpct
+    otpct[:] = dummy_array.copy()
+    dummy_array = np.ones((nyears,)+original_shape[1:])*np.nan
+    dummy_array[:,mask] = HWA
+    HWAout[:] = dummy_array.copy()
+    dummy_array[:,mask] = HWM
+    HWMout[:] = dummy_array.copy()
+    dummy_array[:,mask] = HWN
+    HWNout[:] = dummy_array.copy()
+    dummy_array[:,mask] = HWF
+    HWFout[:] = dummy_array.copy()
+    dummy_array[:,mask] = HWD
+    HWDout[:] = dummy_array.copy() 
+    dummy_array[:,mask] = HWT
+    HWTout[:] = dummy_array.copy()
+    yearlyout.close()
 
-# Save to netCDF
-yearlyout = Dataset('EHF_heatwaves_1911-2014_winter_climpact.nc', mode='w')
-yearlyout.createDimension('time', len(range(syear,eyear)))
-yearlyout.createDimension('lon', len(lons))
-yearlyout.createDimension('lat', len(lats))
-yearlyout.createDimension('day', 365)
-setattr(yearlyout, "author", "Tammas Loughran")
-setattr(yearlyout, "contact", "t.loughran@student.unsw.edu.au")
-setattr(yearlyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
-setattr(yearlyout, "script", "ehfheatwaves.py")
-setattr(yearlyout, "dataset", "AWAP 0.5deg")
-setattr(yearlyout, "base_period", "1961-1990")
-setattr(yearlyout, "percentile", "90th")
-otime = yearlyout.createVariable('time', 'f8', 'time', 
-        fill_value=-999.99)
-setattr(otime, 'units', 'year')
-olat = yearlyout.createVariable('lat', 'f8', 'lat')
-setattr(olat, 'Longname', 'Latitude')
-setattr(olat, 'units', 'degrees_north')
-olon = yearlyout.createVariable('lon', 'f8', 'lon')
-setattr(olon, 'Longname', 'Longitude')
-setattr(olon, 'units', 'degrees_east')
-otpct = yearlyout.createVariable('t90pct', 'f8', ('day','lat','lon'), 
-        fill_value=-999.99)
-setattr(otpct, 'Longname', '90th percentile')
-setattr(otpct, 'units', 'degC')
-setattr(otpct, 'description', '90th percentile of 1961-1990')
-HWAout = yearlyout.createVariable('HWA_EHF', 'f8', ('time','lat','lon'), 
-        fill_value=-999.99)
-setattr(HWAout, 'Longname', 'Peak of the hottest heatwave per year')
-setattr(HWAout, 'units', 'degC2')
-setattr(HWAout, 'description', 
-        'Peak of the hottest heatwave per year')
-HWMout = yearlyout.createVariable('HWM_EHF', 'f8', ('time','lat','lon'),
-        fill_value=-999.99)
-setattr(HWMout, 'Longname', 'Average magnitude of the yearly heatwave')
-setattr(HWMout, 'units', 'degC2')
-setattr(HWMout, 'description', 'Average magnitude of the yearly heatwave')
-HWNout = yearlyout.createVariable('HWN_EHF', 'f8', ('time', 'lat', 'lon'), 
-        fill_value=-999.99)
-setattr(HWNout, 'Longname', 'Number of heatwaves')
-setattr(HWNout, 'units','')
-setattr(HWNout, 'description', 'Number of heatwaves per year')
-HWFout = yearlyout.createVariable('HWF_EHF', 'f8', ('time','lat','lon'), 
-        fill_value=-999.99)
-setattr(HWFout,'Longname','Number of heatwave days')
-setattr(HWFout, 'units', '%')
-setattr(HWFout, 'description', 'Proportion of heatwave days per season')
-HWDout = yearlyout.createVariable('HWD_EHF', 'f8', ('time','lat','lon'), 
-        fill_value=-999.99)
-setattr(HWDout, 'Longname', 'Duration of yearly longest heatwave')
-setattr(HWDout, 'units', 'days')
-setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
-HWTout = yearlyout.createVariable('HWT_EHF', 'f8', ('time','lat','lon'), 
-        fill_value=-999.99)
-setattr(HWTout, 'Longname', 'First heat wave day of the year')
-otime[:] = range(syear, eyear)
-olat[:] = lats
-olon[:] = lons
-otpct[:] = tpct
-HWAout[:]=HWA[:]
-HWMout[:]=HWM[:]
-HWNout[:]=HWN[:]
-HWFout[:]=HWF[:]
-HWDout[:]=HWD[:]
-HWTout[:]=HWT[:]
-yearlyout.close()
-
-if dailyout==True:
+if dailyout:
     dailyout = Dataset('EHF_heatwaves_1911-2014_daily.nc', mode='w')
     dailyout.createDimension('time', len(time))
     dailyout.createDimension('lon', len(lons))
@@ -263,17 +265,21 @@ if dailyout==True:
                 fill_value=-999.99)
     setattr(oehf, 'Longname', 'Excess Heat Factor')
     setattr(oehf, 'units', 'degC2')
-    oevent = dailyout.createVariable('event', 'i8', ('time','lat','lon'),
-                fill_value=-99999)
+    oevent = dailyout.createVariable('event', 'f8', ('time','lat','lon'),
+                fill_value=-999.99)
     setattr(oehf, 'Longname', 'Event indicator')
-    oends = dailyout.createVariable('ends', 'i8', ('time','lat','lon'),
-                        fill_value=-99999)
-    setattr(oends, 'Longname', 'Duration at end of heatwave')
+    oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'),
+                        fill_value=-999.99)
+    setattr(oends, 'Longname', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
     otime[:] = time
     olat[:] = lats
     olon[:] = lons
-    oehf[:] = EHF
-    oevent[:] = event
-    oends[:] = ends
+    dummy_array = np.ones((EHF.shape[0],)+original_shape[1:])*np.nan
+    dummy_array[:,mask] = EHF
+    oehf[:] = dummy_array.copy()
+    dummy_array[:,mask] = event
+    oevent[:] = dummy_array.copy()
+    dummy_array[:,mask] = ends
+    oends[:] = dummy_array.copy()
     dailyout.close()
