@@ -21,7 +21,27 @@ yearlyout = True
 # base period
 bpstart = 1961
 bpend = 1990
-daysinyear = 365
+# calendar
+calendar = 'gregorian'
+if calendar=='gregorian' or '365':
+    daysinyear = 365
+    if season=='winter':
+        seasonlen = 153
+        startday = 121
+        endday = 274
+    else:
+        seasonlen = 151
+        startday = 304
+        endday = 455
+elif calendar=='360':
+    daysinyear = 360
+    seasonlen = 150
+    if season=='winter':
+        startday = 121
+        endday = 271
+    else:
+        startday = 301
+        endday = 451
 # percentile
 pcntl = 90
 
@@ -60,7 +80,15 @@ start = dt.datetime(syear,
 end = dt.datetime(eyear,
         int(str(time[-1])[4:6]),
         int(str(time[-1])[6:8]))
-dates = pd.date_range(start,end)
+if calendar=='360':
+    class calendar360:
+        def __init__(self,syear,eyear):
+            self.year = np.repeat(range(syear,eyear+1), 360, 0)
+            self.month = np.tile(np.repeat(range(1,12+1), 30, 0), 104)
+            self.day = np.tile(np.tile(range(1,30+1), 12), 104)
+    dates = calendar360(syear, eyear)
+else:
+    dates = pd.date_range(start,end)
 
 # Cut out base period
 tave = tave[(dates.month!=2)|(dates.day!=29),...]
@@ -138,14 +166,6 @@ HWD = HWN.copy()
 HWA = HWN.copy()
 HWM = HWN.copy()
 HWT = HWN.copy()
-if season=='winter':
-    seasonlen = 153
-    startday = 121
-    endday = 274
-else:
-    seasonlen = 151
-    startday = 304
-    endday = 455
 for iyear, year in enumerate(xrange(syear,eyear)):
     if (year==eyear)&(season=='summer'): continue 
     HWMtmp = np.ones((daysinyear,tave.shape[1]))*np.nan
