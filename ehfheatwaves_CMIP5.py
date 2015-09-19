@@ -266,19 +266,19 @@ for chunk in xrange(nchunks):
     # Save EHF to file
     #dummy_array = np.ones((EHF.shape[0],)+original_shape[1:])*np.nan
     dummy_array = np.ones(original_shape[1:])*np.nan
-    for i in xrange(EHF.shape[0]):
+    for i in xrange(32, EHF.shape[0]):
         dummy_array[mask] = EHF[i,...]
-        oehf[i] = dummy_array.copy()
-    del EHF
-    pdb.set_trace()
-    dummy_array[:,mask] = event
-    oevent[32+i1:i2] = dummy_array.copy()
-    del event
-    dummy_array[:,mask] = ends
-    oends[32+i1:i2] = dummy_array.copy()
-    del ends
+        oehf[i+i1] = dummy_array.copy()
+        del EHF
+        dummy_array[mask] = event
+        oevent[i+i1] = dummy_array.copy()
+        del event
+        dummy_array[mask] = ends
+        oends[i+i1] = dummy_array.copy()
+        del ends
 
-    pdb.set_trace()
+dailyout.close()
+sys.exit()
 
 
 
