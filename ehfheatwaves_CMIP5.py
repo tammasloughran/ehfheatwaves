@@ -63,6 +63,7 @@ if (season!='summer')&(season!='winter'):
     print 'Use either summer or winter. (Austral)'
     sys.exit(2)
 # save daily EHF output
+yearlyout = True
 dailyout = options.daily
 if options.dailyonly: 
     dailyout = True
@@ -182,8 +183,8 @@ del tmin
 
 # Remove incomplete starting year
 if (dayone.month!=1)|(dayone.day!=1):
-    i = np.argmax(dates.year==dayone.year+1)
-    tave = tave[i:,...]
+    start = np.argmax(dates.year==dayone.year+1)
+    tave = tave[start:,...]
 
 # Calculate EHF
 EHF = np.ones(tave.shape)*np.nan
@@ -331,7 +332,7 @@ if yearlyout:
 
 if dailyout:
     dailyout = Dataset('EHF_heatwaves_%s_%s_%s_daily.nc'%(model, experiment, realization), mode='w')
-    dailyout.createDimension('time', tmaxnc.dimensions['time'].__len__())
+    dailyout.createDimension('time', EHF.shape[0])
     dailyout.createDimension('lon', tmaxnc.dimensions['lon'].__len__())
     dailyout.createDimension('lat', tmaxnc.dimensions['lat'].__len__())
     setattr(dailyout, "author", "Tammas Loughran")
@@ -364,7 +365,10 @@ if dailyout:
                         fill_value=-999.99)
     setattr(oends, 'Longname', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
-    otime[:] = tmaxnc.variables['time'][:]
+    if calendar=='360_day':
+        otime[:] = tmaxnc.variables['time'][start:]
+    else:
+        otime[:] = tmaxnc.variables['time'][:]
     olat[:] = tmaxnc.variables['lat'][:]
     olon[:] = tmaxnc.variables['lon'][:]
     dummy_array = np.ones((EHF.shape[0],)+original_shape[1:])*np.nan
