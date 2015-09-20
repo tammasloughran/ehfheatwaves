@@ -22,12 +22,10 @@ parser.add_option('-x', '--tmax', dest='tmaxfile',
         help='file containing tmax', metavar='FILE')
 parser.add_option('-n', '--tmin', dest='tminfile',
         help='file containing tmin', metavar='FILE')
-parser.add_option('-a', '--tave', dest='tavefile',
-        help='file containing tave', metavar='FILE')
 parser.add_option('-m', '--mask', dest='maskfile',
         help='file containing land-sea mask', metavar='FILE')
 parser.add_option('-s', '--season', dest='season', default='summer',
-        help='season for annual metrics. Defaults to austral summer',
+        help='austal season for annual metrics. Defaults to austral summer',
         metavar='STR')
 parser.add_option('-p', dest='pcntl', type='float', default=90,
         help='the percentile to use for thresholds. Defaults to 90',
@@ -40,12 +38,10 @@ parser.add_option('-q', '--qmethod', dest='qtilemethod', default='climpact',
         metavar='STR')
 parser.add_option('-d', '--daily', action="store_true", dest='daily', 
         help='output daily EHF values and heatwave indicators')
-parser.add_option('-y', '--yearly', action="store_true", dest='yearly',
-        help='output yearly heatwaaspects')
+parser.add_option('--dailyonly', action="store_true", dest='dailyonly',
+        help='output only daily values and suppress yearly output')
 (options, args) = parser.parse_args()
-if options.tavefile:
-    usetave = True
-elif not options.tmaxfile or not options.tminfile:
+if not options.tmaxfile or not options.tminfile:
     print 'Please specify tmax and tmin files if not using tave.'
     sys.exit(2)
 if not options.maskfile:
@@ -63,15 +59,20 @@ pcntl = options.pcntl
 qtilemethod = options.qtilemethod
 # season (winter/summer)
 season = options.season
+if (season!='summer')&(season!='winter'):
+    print 'Use either summer or winter. (Austral)'
+    sys.exit(2)
 # save daily EHF output
 dailyout = options.daily
-yearlyout = options.yearly
+if options.dailyonly: 
+    dailyout = True
+    yearlyout = False
 
 # Load data
 tmaxnc = MFDataset(options.tmaxfile, 'r')
 nctime = tmaxnc.variables['time']
 calendar = nctime.calendar
-if calendar=='gregorian' or 'proleptic_gregorian' or '365_day':
+if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|(calendar=='365_day'):
     daysinyear = 365
     if season=='winter':
         seasonlen = 153
@@ -85,6 +86,7 @@ if calendar=='gregorian' or 'proleptic_gregorian' or '365_day':
             calendar=calendar)
     daylast = netcdftime.num2date(nctime[-1], nctime.units, 
             calendar=calendar)
+    pdb.set_trace()
     dates = pd.date_range(dayone, daylast)
 elif calendar=='360_day':
     daysinyear = 360
@@ -99,20 +101,23 @@ elif calendar=='360_day':
             calendar=calendar)
     daylast = netcdftime.num2date(nctime[-1], nctime.units,
             calendar=calendar)
-    class calendar360:
+    class calendar360():
         def __init__(self,sdate,edate):
             self.year = np.repeat(range(sdate.year,edate.year+1), 360, 0)
             self.month = np.tile(np.repeat(range(1,12+1), 30, 0), 104)
             self.day = np.tile(np.tile(range(1,30+1), 12), 104)
             sdoyi = (sdate.month-1)*30+sdate.day
-            self.year = self.year[sdoy:]
-            self.month = self.month[sdoy:]
-            self.day = self.day[sdoy:]
+            self.year = self.year[sdoyi:]
+            self.month = self.month[sdoyi:]
+            self.day = self.day[sdoyi:]
             edoyi = (12-edate.month)*30+(31-edate.day)
             self.year = self.year[:-edoyi]
             self.month = self.month[:-edoyi]
             self.day = self.day[:-edoyi]
     dates = calendar360(dayone, daylast)
+else:
+    print 'Unrecognized calendar'
+    sys.exit(2)
 
 # Load land-sea mask
 masknc = Dataset(options.maskfile, 'r')
@@ -124,24 +129,21 @@ masknc.close()
 tmax = tmaxnc.variables['tasmax'][(bpstart<=dates.year)&(dates.year<=bpend)]
 original_shape = tmax.shape
 tmax = tmax[:,mask]
-tminnc = MFDataset(options.tminfile)
+if tmaxnc.variables['tasmax'].units=='K': tmax -= 273.15
+tminnc = MFDataset(options.tminfile, 'r')
 tmin = tminnc.variables['tasmin'][(bpstart<=dates.year)&(dates.year<=bpend)]
 tmin = tmin[:,mask]
+if tminnc.variables['tasmin'].units=='K': tmin -= 273.15
 tave_base = (tmax + tmin)/2.
 del tmin
 del tmax
 
 # Remove leap days in gregorian calendars
-if calendar=='gregorian' or 'proleptic_gregorian':
+if (calendar=='gregorian')|(calendar=='proleptic_gregorian'):
     dates_base = dates[(bpstart<=dates.year)&(dates.year<=bpend)]
     tave_base = tave_base[(dates_base.month!=2)|(dates_base.day!=29),...]
     del dates_base
 
-# Select Base period
-#base = ((bpstart<=dates.year)&(dates.year<=bpend))
-#tave_base = tave[base,...]
-
-print 'calculating %ile'
 # Caclulate 90th percentile
 tpct = np.ones((daysinyear,tave_base.shape[1]))*np.nan
 window = np.zeros(daysinyear,dtype=np.bool)
@@ -167,131 +169,64 @@ for day in xrange(daysinyear):
 del tave_base
 del window
 
-#pdb.set_trace()
+# Load data
+tmax = tmaxnc.variables['tasmax'][:]
+tmin = tminnc.variables['tasmin'][:]
+tmax = tmax[:,mask]
+if tmaxnc.variables['tasmax'].units=='K': tmax -= 273.15
+tmin = tmin[:,mask]
+if tminnc.variables['tasmin'].units=='K': tmin -= 273.15
+tave = (tmax + tmin)/2.
+del tmax
+del tmin
 
-# Create a netcdf file for EHF
-dailyout = Dataset('EHF_heatwaves_ACCESS_daily.nc', mode='w')
-dailyout.createDimension('time', len(dates))
-dailyout.createDimension('lon', tmaxnc.dimensions['lon'].__len__())
-dailyout.createDimension('lat', tmaxnc.dimensions['lat'].__len__())
-setattr(dailyout, "author", "Tammas Loughran")
-setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
-setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
-setattr(dailyout, "script", "ehfheatwaves.py")
-setattr(dailyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
-setattr(dailyout, "percentile", "%sth"%(str(pcntl)))
-setattr(dailyout, "dataset", "ACCESS")
-otime = dailyout.createVariable('time', 'f8', 'time',
-                fill_value=-999.99)
-setattr(otime, 'units', 'day as %Y%m%d.%f')
-setattr(otime, 'calendar', '365_day')
-olat = dailyout.createVariable('lat', 'f8', 'lat')
-setattr(olat, 'Longname', 'Latitude')
-setattr(olat, 'units', 'degrees_north') 
-olon = dailyout.createVariable('lon', 'f8', 'lon')
-setattr(olon, 'Longname', 'Longitude')
-setattr(olon, 'units', 'degrees_east')
-oehf = dailyout.createVariable('ehf', 'f8', ('time','lat','lon'),
-            fill_value=-999.99)
-setattr(oehf, 'Longname', 'Excess Heat Factor')
-setattr(oehf, 'units', 'degC2')
-oevent = dailyout.createVariable('event', 'f8', ('time','lat','lon'),
-            fill_value=-999.99)
-setattr(oehf, 'Longname', 'Event indicator')
-oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'),
-                    fill_value=-999.99)
-setattr(oends, 'Longname', 'Duration at start of heatwave')
-setattr(oends, 'units', 'days')
+# Remove incomplete starting year
+if (dayone.month!=1)|(dayone.day!=1):
+    i = np.argmax(dates.year==dayone.year+1)
+    tave = tave[i:,...]
 
-daysinchunks = 50.*daysinyear
-nchunks = int(math.floor(len(dates)/daysinchunks))
-finalchunki = int(nchunks*daysinchunks)
+# Calculate EHF
+EHF = np.ones(tave.shape)*np.nan
+for i in xrange(32,tave.shape[0]):
+    EHIaccl = tave[i-2:i+1,...].sum(axis=0)/3. - \
+            tave[i-32:i-2,...].sum(axis=0)/30.
+    EHIsig = tave[i-2:i+1,...].sum(axis=0)/3. - \
+            tpct[i-365*(i/364),...]
+    EHF[i,...] = np.maximum(EHIaccl,1.)*EHIsig
+EHF[EHF<0] = 0
 
-# Load 50 year chunks
-for chunk in xrange(nchunks):
-    print 'loading chunk', chunk
-    i1 = int(daysinchunks*chunk)
-    i2 = int(daysinchunks*(chunk+1))
-    if chunk==0:
-        tmax = tmaxnc.variables['tasmax'][i1:i2]
-        tmin = tminnc.variables['tasmin'][i1:i2]
-    elif chunk==nchunks:
-        tmax = tmaxnc.variables['tasmax'][finalchunki-31:]
-        tmin = tminnc.variables['tasmin'][finalchunki-31:]
-    else:
-        tmax = tmaxnc.variables['tasmax'][i1-31:i2]
-        tmin = tminnc.variables['tasmin'][i1-31:i2]
-    tmax = tmax[:,mask]
-    tmin = tmin[:,mask]
-    tave = (tmax + tmin)/2.
-    del tmax
-    del tmin
-    print 'calculating ehf'
-    # Calculate EHF
-    EHF = np.ones(tave.shape)*np.nan
-    for i in xrange(32,tave.shape[0]):
-        #if i<31: continue
-        EHIaccl = tave[i-2:i+1,...].sum(axis=0)/3. - \
-                tave[i-32:i-2,...].sum(axis=0)/30.
-        EHIsig = tave[i-2:i+1,...].sum(axis=0)/3. - \
-                tpct[i-365*(i/364),...]
-        EHF[i,...] = np.maximum(EHIaccl,1.)*EHIsig
-    EHF[EHF<0] = 0
+# Agregate consecutive days with EHF>0
+# First day contains duration
+event = (EHF>0.).astype(np.int)
+for i in xrange(event.shape[0]-2,0,-1):
+    event[i,event[i,...]>0] = event[i+1,event[i,...]>0]+1
 
-    # Agregate consecutive days with EHF>0
-    # First day contains duration
-    event = (EHF>0.).astype(np.int)
-    for i in xrange(event.shape[0]-2,0,-1):
-        event[i,event[i,...]>0] = event[i+1,event[i,...]>0]+1
-    # Last day contains duration.
-    #for i in range(1,event.shape[0]):
-    #    event[i,event[i,...]>0] = event[i-1,event[i,...]>0]+1
-    print 'identifying duration'
-    # Identify when heatwaves start with duration
-    # Given that first day contains duration
-    diff = np.zeros(event.shape)
-    diff[1:,...] = np.diff(event, axis=0)
-    ends = np.zeros(tave.shape,dtype=np.int)
-    ends[diff>2] = event[diff>2]
-    del diff
-    print 'removing junk events'
-    # Remove events less than 3 days
-    event[ends==2] = 0
-    event[np.roll(ends==2, 1, axis=0)] = 0
-    event[ends==1] = 0
-    event[event>0] = 1
-    event = event.astype(np.bool)
-    ends[ends<3] = 0
-    print 'saving'
-    # Save EHF to file
-    #dummy_array = np.ones((EHF.shape[0],)+original_shape[1:])*np.nan
-    dummy_array = np.ones(original_shape[1:])*np.nan
-    for i in xrange(32, EHF.shape[0]):
-        dummy_array[mask] = EHF[i,...]
-        oehf[i+i1] = dummy_array.copy()
-        del EHF
-        dummy_array[mask] = event
-        oevent[i+i1] = dummy_array.copy()
-        del event
-        dummy_array[mask] = ends
-        oends[i+i1] = dummy_array.copy()
-        del ends
+# Identify when heatwaves start with duration
+# Given that first day contains duration
+diff = np.zeros(event.shape)
+diff[1:,...] = np.diff(event, axis=0)
+ends = np.zeros(tave.shape,dtype=np.int)
+ends[diff>2] = event[diff>2]
+del diff
 
-dailyout.close()
-sys.exit()
-
-
+# Remove events less than 3 days
+event[ends==2] = 0
+event[np.roll(ends==2, 1, axis=0)] = 0
+event[ends==1] = 0
+event[event>0] = 1
+event = event.astype(np.bool)
+ends[ends<3] = 0
 
 # Calculate metrics year by year
-nyears = len(range(syear,eyear))
+nyears = len(range(dayone.year,daylast.year))
 HWN = np.ones((nyears,tave.shape[1]))*np.nan
 HWF = HWN.copy()
 HWD = HWN.copy()
 HWA = HWN.copy()
 HWM = HWN.copy()
 HWT = HWN.copy()
-for iyear, year in enumerate(xrange(syear,eyear)):
-    if (year==eyear)&(season=='summer'): continue # Last year is incomplete
+for iyear, year in enumerate(xrange(dayone.year,daylast.year)):
+    if (year==daylast.year)&(season=='summer'): continue # Incomplete last yr
     HWMtmp = np.ones((daysinyear,tave.shape[1]))*np.nan
     # Select this years season
     ifrom = startday+daysinyear*iyear
@@ -310,18 +245,25 @@ for iyear, year in enumerate(xrange(syear,eyear)):
 
 # Save to netCDF
 if yearlyout:
-    yearlyout = Dataset('EHF_heatwaves_1911-2014_yearly_%s.nc'%(season), mode='w')
-    yearlyout.createDimension('time', len(range(syear,eyear)))
-    yearlyout.createDimension('lon', len(lons))
-    yearlyout.createDimension('lat', len(lats))
+    experiment = tmaxnc.__getattribute__('experiment')
+    model = tmaxnc.__getattribute__('model_id')
+    realization = tmaxnc.__getattribute__('realization')
+    yearlyout = Dataset('EHF_heatwaves_%s_%s_%s_yearly_%s.nc'%(model, 
+            experiment, realization, season), mode='w')
+    yearlyout.createDimension('time', len(range(dayone.year,
+            daylast.year)))
+    yearlyout.createDimension('lon', tmaxnc.dimensions['lon'].__len__())
+    yearlyout.createDimension('lat', tmaxnc.dimensions['lat'].__len__())
     yearlyout.createDimension('day', daysinyear)
     setattr(yearlyout, "author", "Tammas Loughran")
     setattr(yearlyout, "contact", "t.loughran@student.unsw.edu.au")
     setattr(yearlyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
-    setattr(yearlyout, "script", "ehfheatwaves.py")
-    setattr(yearlyout, "dataset", "AWAP 0.5deg")
+    setattr(yearlyout, "script", "ehfheatwaves_CMIP5.py")
+    setattr(yearlyout, "model_id", model)
+    setattr(yearlyout, "experiment", experiment)
     setattr(yearlyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(yearlyout, "percentile", "%sth"%(str(pcntl)))
+    setattr(yearlyout, "realization", "%s"%(realization))
     otime = yearlyout.createVariable('time', 'f8', 'time', 
             fill_value=-999.99)
     setattr(otime, 'units', 'year')
@@ -331,8 +273,8 @@ if yearlyout:
     olon = yearlyout.createVariable('lon', 'f8', 'lon')
     setattr(olon, 'Longname', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
-    otpct = yearlyout.createVariable('t%spct'%(pcntl), 'f8', ('day','lat','lon'), 
-            fill_value=-999.99)
+    otpct = yearlyout.createVariable('t%spct'%(pcntl), 'f8', 
+	    ('day','lat','lon'), fill_value=-999.99)
     setattr(otpct, 'Longname', '90th percentile')
     setattr(otpct, 'units', 'degC')
     setattr(otpct, 'description', 
@@ -365,10 +307,10 @@ if yearlyout:
     setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
     HWTout = yearlyout.createVariable('HWT_EHF', 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
-    setattr(HWTout, 'Longname', 'First heat wave day of the year')
-    otime[:] = range(syear, eyear)
-    olat[:] = lats
-    olon[:] = lons
+    setattr(HWTout, 'Longname', 'First heat wave day of the season')
+    otime[:] = range(dayone.year, daylast.year)
+    olat[:] = tmaxnc.variables['lat'][:]
+    olon[:] = tmaxnc.variables['lon'][:]
     dummy_array = np.ones((daysinyear,)+original_shape[1:])*np.nan
     dummy_array[:,mask] = tpct
     otpct[:] = dummy_array.copy()
@@ -388,21 +330,23 @@ if yearlyout:
     yearlyout.close()
 
 if dailyout:
-    dailyout = Dataset('EHF_heatwaves_1911-2014_daily.nc', mode='w')
-    dailyout.createDimension('time', len(time))
-    dailyout.createDimension('lon', len(lons))
-    dailyout.createDimension('lat', len(lats))
+    dailyout = Dataset('EHF_heatwaves_%s_%s_%s_daily.nc'%(model, experiment, realization), mode='w')
+    dailyout.createDimension('time', tmaxnc.dimensions['time'].__len__())
+    dailyout.createDimension('lon', tmaxnc.dimensions['lon'].__len__())
+    dailyout.createDimension('lat', tmaxnc.dimensions['lat'].__len__())
     setattr(dailyout, "author", "Tammas Loughran")
     setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
     setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
-    setattr(dailyout, "script", "ehfheatwaves.py")
+    setattr(dailyout, "script", "ehfheatwaves_CMIP5.py")
     setattr(dailyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(dailyout, "percentile", "%sth"%(str(pcntl)))
-    setattr(dailyout, "dataset", "AWAP 0.5deg")
+    setattr(dailyout, "model_id", model)
+    setattr(dailyout, "experiment", experiment)
+    setattr(dailyout, "realization", realization)
     otime = dailyout.createVariable('time', 'f8', 'time',
                     fill_value=-999.99)
-    setattr(otime, 'units', 'day as %Y%m%d.%f')
-    setattr(otime, 'calendar', 'proleptic_gregorian')
+    setattr(otime, 'units', tmaxnc.variables['time'].units)
+    setattr(otime, 'calendar', tmaxnc.variables['time'].calendar)
     olat = dailyout.createVariable('lat', 'f8', 'lat')
     setattr(olat, 'Longname', 'Latitude')
     setattr(olat, 'units', 'degrees_north') 
@@ -420,9 +364,9 @@ if dailyout:
                         fill_value=-999.99)
     setattr(oends, 'Longname', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
-    otime[:] = time
-    olat[:] = lats
-    olon[:] = lons
+    otime[:] = tmaxnc.variables['time'][:]
+    olat[:] = tmaxnc.variables['lat'][:]
+    olon[:] = tmaxnc.variables['lon'][:]
     dummy_array = np.ones((EHF.shape[0],)+original_shape[1:])*np.nan
     dummy_array[:,mask] = EHF
     oehf[:] = dummy_array.copy()
