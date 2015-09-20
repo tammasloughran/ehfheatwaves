@@ -191,7 +191,7 @@ for i in xrange(32,tave.shape[0]):
     EHIaccl = tave[i-2:i+1,...].sum(axis=0)/3. - \
             tave[i-32:i-2,...].sum(axis=0)/30.
     EHIsig = tave[i-2:i+1,...].sum(axis=0)/3. - \
-            tpct[i-365*(i/364),...]
+            tpct[i-daysinyear*int((i+1)/daysinyear),...]
     EHF[i,...] = np.maximum(EHIaccl,1.)*EHIsig
 EHF[EHF<0] = 0
 
