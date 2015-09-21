@@ -13,10 +13,9 @@ import qtiler
 from netCDF4 import MFDataset, Dataset
 import netcdftime
 from optparse import OptionParser
-import pdb
 
 # Parse command line arguments
-usage = 'usage: %prog -x <FILE> -n <FILE> [-a <FILE>] -m <FILE> [options]'
+usage = "usage: %prog -x <FILE> -n <FILE> -m <FILE> [options]"
 parser = OptionParser(usage=usage)
 parser.add_option('-x', '--tmax', dest='tmaxfile', 
         help='file containing tmax', metavar='FILE')
@@ -42,7 +41,7 @@ parser.add_option('--dailyonly', action="store_true", dest='dailyonly',
         help='output only daily values and suppress yearly output')
 (options, args) = parser.parse_args()
 if not options.tmaxfile or not options.tminfile:
-    print 'Please specify tmax and tmin files if not using tave.'
+    print 'Please specify tmax and tmin files.'
     sys.exit(2)
 if not options.maskfile:
     print 'Please specify a land-sea mask file.'
@@ -73,7 +72,8 @@ if options.dailyonly:
 tmaxnc = MFDataset(options.tmaxfile, 'r')
 nctime = tmaxnc.variables['time']
 calendar = nctime.calendar
-if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|(calendar=='365_day'):
+if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
+        (calendar=='365_day')|(calendar=='noleap'):
     daysinyear = 365
     if season=='winter':
         seasonlen = 153
@@ -87,8 +87,7 @@ if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|(calendar=='365_day
             calendar=calendar)
     daylast = netcdftime.num2date(nctime[-1], nctime.units, 
             calendar=calendar)
-    pdb.set_trace()
-    dates = pd.date_range(dayone, daylast)
+    dates = pd.date_range(str(dayone), str(daylast))
 elif calendar=='360_day':
     daysinyear = 360
     seasonlen = 150
@@ -249,7 +248,7 @@ if yearlyout:
     experiment = tmaxnc.__getattribute__('experiment')
     model = tmaxnc.__getattribute__('model_id')
     realization = tmaxnc.__getattribute__('realization')
-    yearlyout = Dataset('EHF_heatwaves_%s_%s_%s_yearly_%s.nc'%(model, 
+    yearlyout = Dataset('EHF_heatwaves_%s_%s_r%s_yearly_%s.nc'%(model, 
             experiment, realization, season), mode='w')
     yearlyout.createDimension('time', len(range(dayone.year,
             daylast.year)))
@@ -331,7 +330,8 @@ if yearlyout:
     yearlyout.close()
 
 if dailyout:
-    dailyout = Dataset('EHF_heatwaves_%s_%s_%s_daily.nc'%(model, experiment, realization), mode='w')
+    dailyout = Dataset('EHF_heatwaves_%s_%s_r%s_daily.nc'\
+            %(model, experiment, realization), mode='w')
     dailyout.createDimension('time', EHF.shape[0])
     dailyout.createDimension('lon', tmaxnc.dimensions['lon'].__len__())
     dailyout.createDimension('lat', tmaxnc.dimensions['lat'].__len__())
