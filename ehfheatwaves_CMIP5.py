@@ -104,16 +104,20 @@ elif calendar=='360_day':
     class calendar360():
         def __init__(self,sdate,edate):
             self.year = np.repeat(range(sdate.year,edate.year+1), 360, 0)
-            self.month = np.tile(np.repeat(range(1,12+1), 30, 0), 104)
-            self.day = np.tile(np.tile(range(1,30+1), 12), 104)
-            sdoyi = (sdate.month-1)*30+sdate.day
-            self.year = self.year[sdoyi:]
-            self.month = self.month[sdoyi:]
-            self.day = self.day[sdoyi:]
-            edoyi = (12-edate.month)*30+(31-edate.day)
-            self.year = self.year[:-edoyi]
-            self.month = self.month[:-edoyi]
-            self.day = self.day[:-edoyi]
+            nyears = len(xrange(sdate.year,edate.year+1))
+            self.month = np.tile(np.repeat(range(1,12+1), 30, 0), nyears)
+            self.day = np.tile(np.tile(range(1,30+1), 12), nyears)
+            if (sdate.day!=1)|(edate.month!=1):
+                sdoyi = (sdate.month-1)*30+sdate.day-1
+                self.year = self.year[sdoyi:]
+                self.month = self.month[sdoyi:]
+                self.day = self.day[sdoyi:]
+            if (edate.day!=30)|(edate.month!=12):
+                edoyi = (12-edate.month)*30+(30-edate.day)
+                self.year = self.year[:-edoyi]
+                self.month = self.month[:-edoyi]
+                self.day = self.day[:-edoyi]
+
     dates = calendar360(dayone, daylast)
 else:
     print 'Unrecognized calendar'
