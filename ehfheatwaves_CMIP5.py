@@ -369,7 +369,7 @@ if dailyout:
                         fill_value=-999.99)
     setattr(oends, 'Longname', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
-    if calendar=='360_day':
+    if (dayone.month!=1)|(dayone.day!=1):
         otime[:] = tmaxnc.variables['time'][start:]
     else:
         otime[:] = tmaxnc.variables['time'][:]
