@@ -248,10 +248,10 @@ for iyear, year in enumerate(xrange(dayone.year,daylast.year)):
     HWT[iyear,...] = np.argmax(event_i,axis=0)
 
 # Save to netCDF
+experiment = tmaxnc.__getattribute__('experiment')
+model = tmaxnc.__getattribute__('model_id')
+realization = tmaxnc.__getattribute__('realization')
 if yearlyout:
-    experiment = tmaxnc.__getattribute__('experiment')
-    model = tmaxnc.__getattribute__('model_id')
-    realization = tmaxnc.__getattribute__('realization')
     yearlyout = Dataset('EHF_heatwaves_%s_%s_r%s_yearly_%s.nc'%(model, 
             experiment, realization, season), mode='w')
     yearlyout.createDimension('time', len(range(dayone.year,
