@@ -148,12 +148,12 @@ diff = np.zeros(event.shape)
 diff[1:,...] = np.diff(event, axis=0)
 ends = np.zeros(tave.shape,dtype=np.int)
 ends[diff>2] = event[diff>2]
-del diff
 
 # Remove events less than 3 days
-event[ends==2] = 0
-event[np.roll(ends==2, 1, axis=0)] = 0
-event[ends==1] = 0
+event[diff==2] = 0
+event[np.roll(diff==2, 1, axis=0)] = 0
+event[diff==1] = 0
+del diff
 event[event>0] = 1
 event = event.astype(np.bool)
 ends[ends<3] = 0
