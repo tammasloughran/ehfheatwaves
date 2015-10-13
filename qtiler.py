@@ -201,7 +201,8 @@ def quantile_climpact(y,p,fraction=False):
         Qp = intrpl(y[left_elem],y[right_elem],h)
     else:
         spacedim = y.shape[1]
-        if y.ndim>2:
+        nodims = y.ndim
+        if nodims>2:
             spacedim = np.array(y.shape)[1:].prod()
             oldshape = y.shape[1:]
             y = y.reshape(y.shape[0], spacedim)
@@ -209,5 +210,5 @@ def quantile_climpact(y,p,fraction=False):
         for lat in range(spacedim):
             array = np.sort(y[:,lat])
             Qp[lat] = intrpl(array[left_elem],array[right_elem],h)
-        if y.ndim>2: Qp = Qp.reshape(oldshape)
+        if nodims>2: Qp = Qp.reshape(oldshape)
     return Qp

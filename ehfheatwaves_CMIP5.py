@@ -1,5 +1,5 @@
 import warnings
-warnings.filterwarnings("ignore")
+warnings.filterwarnings('ignore')
 import sys
 try: 
     import pandas as pd
@@ -19,10 +19,16 @@ usage = "usage: %prog -x <FILE> -n <FILE> -m <FILE> [options]"
 parser = OptionParser(usage=usage)
 parser.add_option('-x', '--tmax', dest='tmaxfile', 
         help='file containing tmax', metavar='FILE')
+parser.add_option('--vnamex', dest='tmaxvname', default='tasmax',
+        help='tmax variable name', metavar='STR')
 parser.add_option('-n', '--tmin', dest='tminfile',
         help='file containing tmin', metavar='FILE')
+parser.add_option('--vnamen', dest='tminvname', default='tasmin',
+        help='tmin variable name', metavar='STR')
 parser.add_option('-m', '--mask', dest='maskfile',
         help='file containing land-sea mask', metavar='FILE')
+parser.add_option('--vnamem', dest='maskvname', default='sftlf',
+        help='mask variable name', metavar='STR')
 parser.add_option('-s', '--season', dest='season', default='summer',
         help='austal season for annual metrics. Defaults to austral summer',
         metavar='STR')
@@ -41,13 +47,12 @@ parser.add_option('--dailyonly', action="store_true", dest='dailyonly',
         help='output only daily values and suppress yearly output')
 (options, args) = parser.parse_args()
 if not options.tmaxfile or not options.tminfile:
-    print 'Please specify tmax and tmin files.'
+    print "Please specify tmax and tmin files."
     sys.exit(2)
 if not options.maskfile:
-    print 'Please specify a land-sea mask file.'
-    sys.exit(2)
+    print "You didn't specify a land-sea mask. It's faster if you do, so this might take a while."
 if len(options.bp)!=9:
-    print 'Incorect base period format.'
+    print "Incorect base period format."
     sys.exit(2)
 else:
     bpstart = int(options.bp[:4])
@@ -59,7 +64,7 @@ qtilemethod = options.qtilemethod
 # season (winter/summer)
 season = options.season
 if (season!='summer')&(season!='winter'):
-    print 'Use either summer or winter. (Austral)'
+    print "Use either summer or winter. (Austral)"
     sys.exit(2)
 # save daily EHF output
 yearlyout = True
@@ -69,25 +74,15 @@ if options.dailyonly:
     yearlyout = False
 
 # Load data
-tmaxnc = MFDataset(options.tmaxfile, 'r')
+try:
+    tmaxnc = MFDataset(options.tmaxfile, 'r')
+except IndexError:
+    tmaxnc = Dataset(options.tmaxfile, 'r')
 nctime = tmaxnc.variables['time']
 calendar = nctime.calendar
-if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
-        (calendar=='365_day')|(calendar=='noleap'):
-    daysinyear = 365
-    if season=='winter':
-        seasonlen = 153
-        startday = 121
-        endday = 274
-    else:
-        seasonlen = 151
-        startday = 304
-        endday = 455
-    dayone = netcdftime.num2date(nctime[0], nctime.units, 
-            calendar=calendar)
-    daylast = netcdftime.num2date(nctime[-1], nctime.units, 
-            calendar=calendar)
-    dates = pd.date_range(str(dayone), str(daylast))
+if not calendar:
+    print 'Unrecognized calendar. Using gregorian.'
+    calendar = 'gregorian'
 elif calendar=='360_day':
     daysinyear = 360
     seasonlen = 150
@@ -117,44 +112,62 @@ elif calendar=='360_day':
                 self.year = self.year[:-edoyi]
                 self.month = self.month[:-edoyi]
                 self.day = self.day[:-edoyi]
-
     dates = calendar360(dayone, daylast)
 else:
-    print 'Unrecognized calendar'
-    sys.exit(2)
+    daysinyear = 365
+    if season=='winter':
+        seasonlen = 153
+        startday = 121
+        endday = 274
+    else:
+        seasonlen = 151
+        startday = 304
+        endday = 455
+    dayone = netcdftime.num2date(nctime[0], nctime.units,
+            calendar=calendar)
+    daylast = netcdftime.num2date(nctime[-1], nctime.units,
+            calendar=calendar)
+    dates = pd.date_range(str(dayone), str(daylast))
 
 # Load land-sea mask
-masknc = Dataset(options.maskfile, 'r')
-mask = masknc.variables['sftlf'][:]
-mask = mask.astype(np.bool)
-masknc.close()
+if options.maskfile:
+    masknc = Dataset(options.maskfile, 'r')
+    vname = options.maskvname
+    mask = masknc.variables[vname][:]
+    mask = mask.astype(np.bool)
+    masknc.close()
 
 # Load base period data
-tmax = tmaxnc.variables['tasmax'][(bpstart<=dates.year)&(dates.year<=bpend)]
+vname = options.tmaxvname
+tmax = tmaxnc.variables[vname][(bpstart<=dates.year)&(dates.year<=bpend)]
 original_shape = tmax.shape
-tmax = tmax[:,mask]
-if tmaxnc.variables['tasmax'].units=='K': tmax -= 273.15
+if options.maskfile:
+    tmax = tmax[:,mask]
+if tmaxnc.variables[vname].units=='K': tmax -= 273.15
 tminnc = MFDataset(options.tminfile, 'r')
-tmin = tminnc.variables['tasmin'][(bpstart<=dates.year)&(dates.year<=bpend)]
-tmin = tmin[:,mask]
-if tminnc.variables['tasmin'].units=='K': tmin -= 273.15
+vname = options.tminvname
+tmin = tminnc.variables[vname][(bpstart<=dates.year)&(dates.year<=bpend)]
+if options.maskfile:
+    tmin = tmin[:,mask]
+if tminnc.variables[vname].units=='K': tmin -= 273.15
 tave_base = (tmax + tmin)/2.
 del tmin
 del tmax
 
 # Remove leap days in gregorian calendars
-if (calendar=='gregorian')|(calendar=='proleptic_gregorian'):
+if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
+            (calendar=='standard'):
     dates_base = dates[(bpstart<=dates.year)&(dates.year<=bpend)]
     tave_base = tave_base[(dates_base.month!=2)|(dates_base.day!=29),...]
     del dates_base
 
 # Caclulate 90th percentile
-tpct = np.ones((daysinyear,tave_base.shape[1]))*np.nan
+tpct = np.ones(((daysinyear,)+tave_base.shape[1:]))*np.nan
 window = np.zeros(daysinyear,dtype=np.bool)
 wsize = 15.
 window[-np.floor(wsize/2.):] = 1
 window[:np.ceil(wsize/2.)] = 1
-window = np.tile(window,30)
+window = np.tile(window,bpend+1-bpstart)
 if qtilemethod=='python':
     percentile = np.percentile
     parameter = 0
@@ -174,15 +187,22 @@ del tave_base
 del window
 
 # Load data
-tmax = tmaxnc.variables['tasmax'][:]
-tmin = tminnc.variables['tasmin'][:]
-tmax = tmax[:,mask]
-if tmaxnc.variables['tasmax'].units=='K': tmax -= 273.15
-tmin = tmin[:,mask]
-if tminnc.variables['tasmin'].units=='K': tmin -= 273.15
+tmax = tmaxnc.variables[options.tmaxvname][:]
+tmin = tminnc.variables[options.tminvname][:]
+if options.maskfile:
+    tmax = tmax[:,mask]
+if tmaxnc.variables[options.tmaxvname].units=='K': tmax -= 273.15
+if options.maskfile:
+    tmin = tmin[:,mask]
+if tminnc.variables[options.tminvname].units=='K': tmin -= 273.15
 tave = (tmax + tmin)/2.
 del tmax
 del tmin
+
+# Remove leap days from tave
+if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
+            (calendar=='standard'):
+    tave = tave[(dates.month!=2)|(dates.day!=29),...]
 
 # Remove incomplete starting year
 if (dayone.month!=1)|(dayone.day!=1):
@@ -223,7 +243,7 @@ ends[ends<3] = 0
 
 # Calculate metrics year by year
 nyears = len(range(dayone.year,daylast.year))
-HWN = np.ones((nyears,tave.shape[1]))*np.nan
+HWN = np.ones(((nyears,)+tave.shape[1:]))*np.nan
 HWF = HWN.copy()
 HWD = HWN.copy()
 HWA = HWN.copy()
@@ -231,7 +251,7 @@ HWM = HWN.copy()
 HWT = HWN.copy()
 for iyear, year in enumerate(xrange(dayone.year,daylast.year)):
     if (year==daylast.year)&(season=='summer'): continue # Incomplete last yr
-    HWMtmp = np.ones((daysinyear,tave.shape[1]))*np.nan
+    HWMtmp = np.ones(((daysinyear,)+tave.shape[1:]))*np.nan
     # Select this years season
     ifrom = startday+daysinyear*iyear
     ito = endday+daysinyear*iyear
@@ -240,19 +260,26 @@ for iyear, year in enumerate(xrange(dayone.year,daylast.year)):
     duration_i = ends[ifrom:ito,...].astype(np.float)
     # Calculate metrics
     HWN[iyear,...] = (duration_i>0).sum(axis=0)
-    HWF[iyear,...] = 100*duration_i.sum(axis=0)/float(seasonlen)
+    HWF[iyear,...] = duration_i.sum(axis=0)
     HWD[iyear,...] = duration_i.max(axis=0)
+    HWD[iyear,HWD[iyear,...]==0] = np.nan
     HWA[iyear,...] = EHF_i.max(axis=0)
+    HWA[iyear,HWA[iyear,...]==0] = np.nan
     HWMtmp[event_i==True] = EHF_i[event_i==True]
     HWM[iyear,...] = np.nanmean(HWMtmp, axis=0)
     HWT[iyear,...] = np.argmax(event_i,axis=0)
 
 # Save to netCDF
-experiment = tmaxnc.__getattribute__('experiment')
-model = tmaxnc.__getattribute__('model_id')
-realization = tmaxnc.__getattribute__('realization')
+try:
+    experiment = tmaxnc.__getattribute__('experiment')
+    model = tmaxnc.__getattribute__('model_id')
+    realization = tmaxnc.__getattribute__('realization')
+except AttributeError:
+    experiment = ''
+    model = ''
+    realization = ''
 if yearlyout:
-    yearlyout = Dataset('EHF_heatwaves_%s_%s_r%s_yearly_%s.nc'%(model, 
+    yearlyout = Dataset('EHF_heatwavesmod_%s_%s_r%s_yearly_%s.nc'%(model, 
             experiment, realization, season), mode='w')
     yearlyout.createDimension('time', len(range(dayone.year,
             daylast.year)))
@@ -302,11 +329,11 @@ if yearlyout:
     HWFout = yearlyout.createVariable('HWF_EHF', 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
     setattr(HWFout,'Longname','Number of heatwave days')
-    setattr(HWFout, 'units', '%')
+    setattr(HWFout, 'units', 'days')
     setattr(HWFout, 'description', 'Proportion of heatwave days per season')
     HWDout = yearlyout.createVariable('HWD_EHF', 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
-    setattr(HWDout, 'Longname', 'Duration of yearly longest heatwave')
+    setattr(HWDout, 'Longname', 'Duration of longest heatwave')
     setattr(HWDout, 'units', 'days')
     setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
     HWTout = yearlyout.createVariable('HWT_EHF', 'f8', ('time','lat','lon'), 
@@ -316,21 +343,30 @@ if yearlyout:
     olat[:] = tmaxnc.variables['lat'][:]
     olon[:] = tmaxnc.variables['lon'][:]
     dummy_array = np.ones((daysinyear,)+original_shape[1:])*np.nan
-    dummy_array[:,mask] = tpct
-    otpct[:] = dummy_array.copy()
-    dummy_array = np.ones((nyears,)+original_shape[1:])*np.nan
-    dummy_array[:,mask] = HWA
-    HWAout[:] = dummy_array.copy()
-    dummy_array[:,mask] = HWM
-    HWMout[:] = dummy_array.copy()
-    dummy_array[:,mask] = HWN
-    HWNout[:] = dummy_array.copy()
-    dummy_array[:,mask] = HWF
-    HWFout[:] = dummy_array.copy()
-    dummy_array[:,mask] = HWD
-    HWDout[:] = dummy_array.copy() 
-    dummy_array[:,mask] = HWT
-    HWTout[:] = dummy_array.copy()
+    if options.maskfile:
+        dummy_array[:,mask] = tpct
+        otpct[:] = dummy_array.copy()
+        dummy_array = np.ones((nyears,)+original_shape[1:])*np.nan
+        dummy_array[:,mask] = HWA
+        HWAout[:] = dummy_array.copy()
+        dummy_array[:,mask] = HWM
+        HWMout[:] = dummy_array.copy()
+        dummy_array[:,mask] = HWN
+        HWNout[:] = dummy_array.copy()
+        dummy_array[:,mask] = HWF
+        HWFout[:] = dummy_array.copy()
+        dummy_array[:,mask] = HWD
+        HWDout[:] = dummy_array.copy() 
+        dummy_array[:,mask] = HWT
+        HWTout[:] = dummy_array.copy()
+    else:
+        otpct[:] = tpct
+        HWAout[:] = HWA
+        HWMout[:] = HWM
+        HWNout[:] = HWN
+        HWFout[:] = HWF
+        HWDout[:] = HWD
+        HWTout[:] = HWT
     yearlyout.close()
 
 if dailyout:
@@ -375,11 +411,16 @@ if dailyout:
         otime[:] = tmaxnc.variables['time'][:]
     olat[:] = tmaxnc.variables['lat'][:]
     olon[:] = tmaxnc.variables['lon'][:]
-    dummy_array = np.ones((EHF.shape[0],)+original_shape[1:])*np.nan
-    dummy_array[:,mask] = EHF
-    oehf[:] = dummy_array.copy()
-    dummy_array[:,mask] = event
-    oevent[:] = dummy_array.copy()
-    dummy_array[:,mask] = ends
-    oends[:] = dummy_array.copy()
+    if options.maskfile:
+        dummy_array = np.ones((EHF.shape[0],)+original_shape[1:])*np.nan
+        dummy_array[:,mask] = EHF
+        oehf[:] = dummy_array.copy()
+        dummy_array[:,mask] = event
+        oevent[:] = dummy_array.copy()
+        dummy_array[:,mask] = ends
+        oends[:] = dummy_array.copy()
+    else:
+        oehf[:] = EHF
+        oevent[:] = event
+        oends[:] = ends
     dailyout.close()
