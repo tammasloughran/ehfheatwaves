@@ -13,6 +13,7 @@ import qtiler
 from netCDF4 import MFDataset, Dataset
 import netcdftime
 from optparse import OptionParser
+from subprocess
 
 # Parse command line arguments
 usage = "usage: %prog -x <FILE> -n <FILE> -m <FILE> [options]"
@@ -315,13 +316,27 @@ if yearlyout:
     yearlyout.createDimension('day', daysinyear)
     setattr(yearlyout, "author", "Tammas Loughran")
     setattr(yearlyout, "contact", "t.loughran@student.unsw.edu.au")
+    setattr(yearlyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(yearlyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(yearlyout, "script", "ehfheatwaves_CMIP5.py")
     setattr(yearlyout, "model_id", model)
     setattr(yearlyout, "experiment", experiment)
+    setattr(yearlyout, "period", "%s-%s"%(str(dayone.year),str(daylast.year)))
     setattr(yearlyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(yearlyout, "percentile", "%sth"%(str(pcntl)))
     setattr(yearlyout, "realization", "%s"%(realization))
+    setattr(yearlyout, "frequency", "yearly")
+    setattr(yearlyout, "season", season)
+    if season=='summer':
+        definition = 'Nov-Mar'
+    elif season=='winter':
+        definition = 'May-Sep'
+    setattr(yearlyout, "definition", definition)
+    setattr(yearlyout, "season_note", "The year of a season is the year it starts in")
+    setattr(yearlyout, "git_commit", subprocess.check_output(['git', 'rev-parse', 'HEAD']))
+    setattr(yearlyout, "tmax_file", options.tmaxfile)
+    setattr(yearlyout, "tmin_file", options.tminfile)
+    setattr(yearlyout, "mask_file", options.maskfile)
     otime = yearlyout.createVariable('time', 'f8', 'time', 
             fill_value=-999.99)
     setattr(otime, 'units', 'year')
@@ -404,13 +419,19 @@ if dailyout:
     dailyout.createDimension('lat', tmaxnc.dimensions['lat'].__len__())
     setattr(dailyout, "author", "Tammas Loughran")
     setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
+    setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(dailyout, "script", "ehfheatwaves_CMIP5.py")
+    setattr(dailyout, "period", "%s-%s"%(str(dayone.year),str(daylast.year)))
     setattr(dailyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(dailyout, "percentile", "%sth"%(str(pcntl)))
     setattr(dailyout, "model_id", model)
     setattr(dailyout, "experiment", experiment)
     setattr(dailyout, "realization", realization)
+    setattr(dailyout, "git_commit", subprocess.check_output(['git', 'rev-parse', 'HEAD']))
+    setattr(dailyout, "tmax_file", options.tmaxfile)
+    setattr(dailyout, "tmin_file", options.tminfile)
+    setattr(dailyout, "mask_file", options.maskfile)
     otime = dailyout.createVariable('time', 'f8', 'time',
                     fill_value=-999.99)
     setattr(otime, 'units', tmaxnc.variables['time'].units)
