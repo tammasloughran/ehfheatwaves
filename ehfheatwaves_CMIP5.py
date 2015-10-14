@@ -13,7 +13,7 @@ import qtiler
 from netCDF4 import MFDataset, Dataset
 import netcdftime
 from optparse import OptionParser
-from subprocess
+import subprocess
 
 # Parse command line arguments
 usage = "usage: %prog -x <FILE> -n <FILE> -m <FILE> [options]"
