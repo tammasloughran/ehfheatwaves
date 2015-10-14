@@ -219,55 +219,82 @@ for i in xrange(32,tave.shape[0]):
     EHF[i,...] = np.maximum(EHIaccl,1.)*EHIsig
 EHF[EHF<0] = 0
 
-# Agregate consecutive days with EHF>0
-# First day contains duration
-event = (EHF>0.).astype(np.int)
-for i in xrange(event.shape[0]-2,0,-1):
-    event[i,event[i,...]>0] = event[i+1,event[i,...]>0]+1
+def identify_hw(ehfs):
+    """identify_hw locates heatwaves from EHF and returns an event indicator 
+    and a duration indicator.
+    """
+    # Agregate consecutive days with EHF>0
+    # First day contains duration
+    events = (ehfs>0.).astype(np.int)
+    for i in xrange(events.shape[0]-2,0,-1):
+         events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
 
-# Identify when heatwaves start with duration
-# Given that first day contains duration
-diff = np.zeros(event.shape)
-diff[1:,...] = np.diff(event, axis=0)
-ends = np.zeros(tave.shape,dtype=np.int)
-ends[diff>2] = event[diff>2]
+    # Identify when heatwaves start with duration
+    # Given that first day contains duration
+    diff = np.zeros(events.shape)
+    diff[1:,...] = np.diff(events, axis=0)
+    endss = np.zeros(ehfs.shape,dtype=np.int)
+    endss[diff>2] = events[diff>2]
 
-# Remove events less than 3 days
-event[diff==2] = 0
-event[np.roll(diff==2, 1, axis=0)] = 0
-event[diff==1] = 0
-del diff
-event[event>0] = 1
-event = event.astype(np.bool)
-ends[ends<3] = 0
+    # Remove events less than 3 days
+    events[diff==2] = 0
+    events[np.roll(diff==2, 1, axis=0)] = 0
+    events[diff==1] = 0
+    del diff
+    events[events>0] = 1
+    events = events.astype(np.bool)
+    endss[endss<3] = 0
+    return events, endss
+
+# For daily output
+if dailyout:
+    event, ends = identify_hw(EHF)
 
 # Calculate metrics year by year
-nyears = len(range(dayone.year,daylast.year))
-HWN = np.ones(((nyears,)+tave.shape[1:]))*np.nan
-HWF = HWN.copy()
-HWD = HWN.copy()
-HWA = HWN.copy()
-HWM = HWN.copy()
-HWT = HWN.copy()
-for iyear, year in enumerate(xrange(dayone.year,daylast.year)):
-    if (year==daylast.year)&(season=='summer'): continue # Incomplete last yr
-    HWMtmp = np.ones(((daysinyear,)+tave.shape[1:]))*np.nan
-    # Select this years season
-    ifrom = startday+daysinyear*iyear
-    ito = endday+daysinyear*iyear
-    EHF_i = EHF[ifrom:ito,...]
-    event_i = event[ifrom:ito,...]
-    duration_i = ends[ifrom:ito,...].astype(np.float)
-    # Calculate metrics
-    HWN[iyear,...] = (duration_i>0).sum(axis=0)
-    HWF[iyear,...] = duration_i.sum(axis=0)
-    HWD[iyear,...] = duration_i.max(axis=0)
-    HWD[iyear,HWD[iyear,...]==0] = np.nan
-    HWA[iyear,...] = EHF_i.max(axis=0)
-    HWA[iyear,HWA[iyear,...]==0] = np.nan
-    HWMtmp[event_i==True] = EHF_i[event_i==True]
-    HWM[iyear,...] = np.nanmean(HWMtmp, axis=0)
-    HWT[iyear,...] = np.argmax(event_i,axis=0)
+if yearlyout:
+    nyears = len(range(dayone.year,daylast.year))
+    space = EHF.shape[1:]
+    if len(space)>1:
+        EHF = EHF.reshape(EHF.shape[0],space[0]*space[1])
+    HWA = np.ones(((nyears,)+(EHF.shape[1],)))*np.nan
+    HWM = HWA.copy()
+    HWN = HWA.copy()
+    HWF = HWA.copy()
+    HWD = HWA.copy()
+    HWT = HWA.copy()
+    for iyear, year in enumerate(xrange(dayone.year,daylast.year)):
+        if (year==daylast.year)&(season=='summer'): continue # Incomplete yr
+        # Select this years season
+        allowance = 10 # For including heawave days after the end of the season
+        ifrom = startday + daysinyear*iyear
+        ito = endday + daysinyear*iyear + allowance
+        EHF_i = EHF[ifrom:ito,...]
+        event_i, duration_i = identify_hw(EHF_i)
+        # Remove events that start after the end of the season
+        duration_i = duration_i[:-allowance]
+        event_i = event_i[:-allowance]
+        # Calculate metrics
+        HWN[iyear,...] = (duration_i>0).sum(axis=0)
+        HWF[iyear,...] = duration_i.sum(axis=0)
+        HWD[iyear,...] = duration_i.max(axis=0)
+        HWD[iyear,HWD[iyear,...]==0] = np.nan
+        # HWM and HWA must be done on each gridcell
+        for x in xrange(EHF_i.shape[1]):
+            hw_mag = []
+            # retrieve indices where heatwaves start.
+            i = np.where(duration_i[:,x]>0)[0] # time
+            d = duration_i[i,x] # duration
+            if (d==0).all(): continue
+            for hw in xrange(len(d)):
+                # retireve this heatwave's EHF values and mean magnitude
+                hwdat = EHF_i[i[hw]:i[hw]+d[hw],x]
+                hw_mag.append(np.nanmean(hwdat))
+            HWM[iyear,x] = np.nanmean(hw_mag)
+            # Find the hottest heatwave magnitude
+            idex = np.where(hw_mag==max(hw_mag))[0]
+            # Find that heatwave's hottest day as EHF value.
+            HWA[iyear,x] = EHF_i[i[idex]:i[idex]+d[idex],x].max()
+        HWT[iyear,...] = np.argmax(event_i,axis=0)
 
 # Save to netCDF
 try:
@@ -279,7 +306,7 @@ except AttributeError:
     model = ''
     realization = ''
 if yearlyout:
-    yearlyout = Dataset('EHF_heatwavesmod_%s_%s_r%s_yearly_%s.nc'%(model, 
+    yearlyout = Dataset('EHF_heatwaves_%s_%s_r%s_yearly_%s.nc'%(model, 
             experiment, realization, season), mode='w')
     yearlyout.createDimension('time', len(range(dayone.year,
             daylast.year)))
@@ -361,12 +388,12 @@ if yearlyout:
         HWTout[:] = dummy_array.copy()
     else:
         otpct[:] = tpct
-        HWAout[:] = HWA
-        HWMout[:] = HWM
-        HWNout[:] = HWN
-        HWFout[:] = HWF
-        HWDout[:] = HWD
-        HWTout[:] = HWT
+        HWAout[:] = HWA.reshape((nyears,)+space)
+        HWMout[:] = HWM.reshape((nyears,)+space)
+        HWNout[:] = HWN.reshape((nyears,)+space)
+        HWFout[:] = HWF.reshape((nyears,)+space)
+        HWDout[:] = HWD.reshape((nyears,)+space)
+        HWTout[:] = HWT.reshape((nyears,)+space)
     yearlyout.close()
 
 if dailyout:
