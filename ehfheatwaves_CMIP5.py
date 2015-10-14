@@ -296,6 +296,8 @@ if yearlyout:
             # Find that heatwave's hottest day as EHF value.
             HWA[iyear,x] = EHF_i[i[idex]:i[idex]+d[idex],x].max()
         HWT[iyear,...] = np.argmax(event_i,axis=0)
+    if len(space)>1:
+    	EHF = EHF.reshape(EHF.shape[0],space[0],space[1])
 
 # Save to netCDF
 try:
@@ -319,12 +321,13 @@ if yearlyout:
     setattr(yearlyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(yearlyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(yearlyout, "script", "ehfheatwaves_CMIP5.py")
-    setattr(yearlyout, "model_id", model)
-    setattr(yearlyout, "experiment", experiment)
+    if model:
+        setattr(yearlyout, "model_id", model)
+        setattr(yearlyout, "experiment", experiment)
+        setattr(yearlyout, "realization", "%s"%(realization))
     setattr(yearlyout, "period", "%s-%s"%(str(dayone.year),str(daylast.year)))
     setattr(yearlyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(yearlyout, "percentile", "%sth"%(str(pcntl)))
-    setattr(yearlyout, "realization", "%s"%(realization))
     setattr(yearlyout, "frequency", "yearly")
     setattr(yearlyout, "season", season)
     if season=='summer':
@@ -336,51 +339,58 @@ if yearlyout:
     setattr(yearlyout, "git_commit", subprocess.check_output(['git', 'rev-parse', 'HEAD']))
     setattr(yearlyout, "tmax_file", options.tmaxfile)
     setattr(yearlyout, "tmin_file", options.tminfile)
-    setattr(yearlyout, "mask_file", options.maskfile)
+    if options.maskfile:
+        setattr(yearlyout, "mask_file", options.maskfile)
     otime = yearlyout.createVariable('time', 'f8', 'time', 
             fill_value=-999.99)
     setattr(otime, 'units', 'year')
     olat = yearlyout.createVariable('lat', 'f8', 'lat')
-    setattr(olat, 'Longname', 'Latitude')
+    setattr(olat, 'standard_name', 'latitude')
+    setattr(olat, 'long_name', 'Latitude')
     setattr(olat, 'units', 'degrees_north')
+    setattr(olat, 'axis', 'Y')
     olon = yearlyout.createVariable('lon', 'f8', 'lon')
-    setattr(olon, 'Longname', 'Longitude')
+    setattr(olon, 'standard_name', 'longiitude')
+    setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
+    setattr(olon, 'axis', 'X')
     otpct = yearlyout.createVariable('t%spct'%(pcntl), 'f8', 
 	    ('day','lat','lon'), fill_value=-999.99)
-    setattr(otpct, 'Longname', '90th percentile')
+    setattr(otpct, 'long_name', '90th percentile')
     setattr(otpct, 'units', 'degC')
     setattr(otpct, 'description', 
             '90th percentile of %s-%s'%(str(bpstart),str(bpend)))
     HWAout = yearlyout.createVariable('HWA_EHF', 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
-    setattr(HWAout, 'Longname', 'Peak of the hottest heatwave per year')
+    setattr(HWAout, 'long_name', 'Heatwave Amplitude')
     setattr(HWAout, 'units', 'degC2')
     setattr(HWAout, 'description', 
             'Peak of the hottest heatwave per year')
     HWMout = yearlyout.createVariable('HWM_EHF', 'f8', ('time','lat','lon'),
             fill_value=-999.99)
-    setattr(HWMout, 'Longname', 'Average magnitude of the yearly heatwave')
+    setattr(HWMout, 'long_name', 'Heatwave Magnitude')
     setattr(HWMout, 'units', 'degC2')
     setattr(HWMout, 'description', 'Average magnitude of the yearly heatwave')
     HWNout = yearlyout.createVariable('HWN_EHF', 'f8', ('time', 'lat', 'lon'), 
             fill_value=-999.99)
-    setattr(HWNout, 'Longname', 'Number of heatwaves')
+    setattr(HWNout, 'long_name', 'Heatwave Number')
     setattr(HWNout, 'units','')
     setattr(HWNout, 'description', 'Number of heatwaves per year')
     HWFout = yearlyout.createVariable('HWF_EHF', 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
-    setattr(HWFout,'Longname','Number of heatwave days')
+    setattr(HWFout, 'long_name','Heatwave Frequency')
     setattr(HWFout, 'units', 'days')
     setattr(HWFout, 'description', 'Proportion of heatwave days per season')
     HWDout = yearlyout.createVariable('HWD_EHF', 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
-    setattr(HWDout, 'Longname', 'Duration of longest heatwave')
+    setattr(HWDout, 'long_name', 'Heatwave Duration')
     setattr(HWDout, 'units', 'days')
     setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
     HWTout = yearlyout.createVariable('HWT_EHF', 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
-    setattr(HWTout, 'Longname', 'First heat wave day of the season')
+    setattr(HWTout, 'long_name', 'Heatwave Timing')
+    setattr(HWTout, 'units', 'days from strat of season')
+    setattr(HWTout, 'description', 'First heat wave day of the season')
     otime[:] = range(dayone.year, daylast.year)
     olat[:] = tmaxnc.variables['lat'][:]
     olon[:] = tmaxnc.variables['lon'][:]
@@ -425,33 +435,39 @@ if dailyout:
     setattr(dailyout, "period", "%s-%s"%(str(dayone.year),str(daylast.year)))
     setattr(dailyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(dailyout, "percentile", "%sth"%(str(pcntl)))
-    setattr(dailyout, "model_id", model)
-    setattr(dailyout, "experiment", experiment)
-    setattr(dailyout, "realization", realization)
+    if model:
+        setattr(dailyout, "model_id", model)
+        setattr(dailyout, "experiment", experiment)
+        setattr(dailyout, "realization", realization)
     setattr(dailyout, "git_commit", subprocess.check_output(['git', 'rev-parse', 'HEAD']))
     setattr(dailyout, "tmax_file", options.tmaxfile)
     setattr(dailyout, "tmin_file", options.tminfile)
-    setattr(dailyout, "mask_file", options.maskfile)
+    if options.maskfile:
+        setattr(dailyout, "mask_file", str(options.maskfile))
     otime = dailyout.createVariable('time', 'f8', 'time',
                     fill_value=-999.99)
     setattr(otime, 'units', tmaxnc.variables['time'].units)
     setattr(otime, 'calendar', tmaxnc.variables['time'].calendar)
     olat = dailyout.createVariable('lat', 'f8', 'lat')
-    setattr(olat, 'Longname', 'Latitude')
+    setattr(olat, 'standard_name', 'latitude')
+    setattr(olat, 'long_name', 'Latitude')
     setattr(olat, 'units', 'degrees_north') 
     olon = dailyout.createVariable('lon', 'f8', 'lon')
-    setattr(olon, 'Longname', 'Longitude')
+    setattr(olon, 'standard_name', 'longitude')
+    setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
     oehf = dailyout.createVariable('ehf', 'f8', ('time','lat','lon'),
                 fill_value=-999.99)
-    setattr(oehf, 'Longname', 'Excess Heat Factor')
+    setattr(oehf, 'standard_name', 'EHF')
+    setattr(oehf, 'long_name', 'Excess Heat Factor')
     setattr(oehf, 'units', 'degC2')
     oevent = dailyout.createVariable('event', 'f8', ('time','lat','lon'),
                 fill_value=-999.99)
-    setattr(oehf, 'Longname', 'Event indicator')
+    setattr(oevent, 'long_name', 'Event indicator')
+    setattr(oevent, 'description', 'Indicates whether a heatwave is happening on that day')
     oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'),
                         fill_value=-999.99)
-    setattr(oends, 'Longname', 'Duration at start of heatwave')
+    setattr(oends, 'long_name', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
     if (dayone.month!=1)|(dayone.day!=1):
         otime[:] = tmaxnc.variables['time'][start:]
