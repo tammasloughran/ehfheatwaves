@@ -114,6 +114,9 @@ elif calendar=='360_day':
                 self.month = self.month[:-edoyi]
                 self.day = self.day[:-edoyi]
     dates = calendar360(dayone, daylast)
+    shorten = 0
+    if (daylast.day!=30)|(daylast.month!=12):
+        shorten = 30*(13-daylast.month) - daylast.day
 else:
     daysinyear = 365
     if season=='winter':
@@ -129,6 +132,11 @@ else:
     daylast = netcdftime.num2date(nctime[-1], nctime.units,
             calendar=calendar)
     dates = pd.date_range(str(dayone), str(daylast))
+    shorten = 0
+    if (daylast.day!=30)|(daylast.month!=12):
+        endofdata = dt.datetime(2000, daylast.month, daylast.day)
+        shorten = dt.datetime(2000, 12, 31) - endofdata
+        shorten = shorten.days
 
 # Load land-sea mask
 if options.maskfile:
@@ -206,8 +214,10 @@ if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
     tave = tave[(dates.month!=2)|(dates.day!=29),...]
 
 # Remove incomplete starting year
+first_year = dayone.year
 if (dayone.month!=1)|(dayone.day!=1):
-    start = np.argmax(dates.year==dayone.year+1)
+    first_year = dayone.year+1
+    start = np.argmax(dates.year==first_year)
     tave = tave[start:,...]
 
 # Calculate EHF
@@ -252,8 +262,8 @@ if dailyout:
     event, ends = identify_hw(EHF)
 
 # Calculate metrics year by year
+nyears = len(range(first_year,daylast.year+1))
 if yearlyout:
-    nyears = len(range(dayone.year,daylast.year))
     space = EHF.shape[1:]
     if len(space)>1:
         EHF = EHF.reshape(EHF.shape[0],space[0]*space[1])
@@ -311,8 +321,8 @@ except AttributeError:
 if yearlyout:
     yearlyout = Dataset('EHF_heatwaves_%s_%s_r%s_yearly_%s.nc'%(model, 
             experiment, realization, season), mode='w')
-    yearlyout.createDimension('time', len(range(dayone.year,
-            daylast.year)))
+    yearlyout.createDimension('time', len(range(first_year,
+            daylast.year+1)))
     yearlyout.createDimension('lon', tmaxnc.dimensions['lon'].__len__())
     yearlyout.createDimension('lat', tmaxnc.dimensions['lat'].__len__())
     yearlyout.createDimension('day', daysinyear)
@@ -325,7 +335,7 @@ if yearlyout:
         setattr(yearlyout, "model_id", model)
         setattr(yearlyout, "experiment", experiment)
         setattr(yearlyout, "realization", "%s"%(realization))
-    setattr(yearlyout, "period", "%s-%s"%(str(dayone.year),str(daylast.year)))
+    setattr(yearlyout, "period", "%s-%s"%(str(first_year),str(daylast.year)))
     setattr(yearlyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(yearlyout, "percentile", "%sth"%(str(pcntl)))
     setattr(yearlyout, "frequency", "yearly")
@@ -391,7 +401,7 @@ if yearlyout:
     setattr(HWTout, 'long_name', 'Heatwave Timing')
     setattr(HWTout, 'units', 'days from strat of season')
     setattr(HWTout, 'description', 'First heat wave day of the season')
-    otime[:] = range(dayone.year, daylast.year)
+    otime[:] = range(first_year, daylast.year+1)
     olat[:] = tmaxnc.variables['lat'][:]
     olon[:] = tmaxnc.variables['lon'][:]
     dummy_array = np.ones((daysinyear,)+original_shape[1:])*np.nan
@@ -432,7 +442,7 @@ if dailyout:
     setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(dailyout, "script", "ehfheatwaves_CMIP5.py")
-    setattr(dailyout, "period", "%s-%s"%(str(dayone.year),str(daylast.year)))
+    setattr(dailyout, "period", "%s-%s"%(str(first_year),str(daylast.year)))
     setattr(dailyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(dailyout, "percentile", "%sth"%(str(pcntl)))
     if model:
@@ -446,8 +456,10 @@ if dailyout:
         setattr(dailyout, "mask_file", str(options.maskfile))
     otime = dailyout.createVariable('time', 'f8', 'time',
                     fill_value=-999.99)
-    setattr(otime, 'units', tmaxnc.variables['time'].units)
-    setattr(otime, 'calendar', tmaxnc.variables['time'].calendar)
+    setattr(otime, 'units', 'days since %s-01-01'%(first_year))
+    if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|(calendar=='standard'):
+        calendar = '365_day'
+    setattr(otime, 'calendar', calendar)
     olat = dailyout.createVariable('lat', 'f8', 'lat')
     setattr(olat, 'standard_name', 'latitude')
     setattr(olat, 'long_name', 'Latitude')
@@ -469,10 +481,7 @@ if dailyout:
                         fill_value=-999.99)
     setattr(oends, 'long_name', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
-    if (dayone.month!=1)|(dayone.day!=1):
-        otime[:] = tmaxnc.variables['time'][start:]
-    else:
-        otime[:] = tmaxnc.variables['time'][:]
+    otime[:] = range(1,nyears*daysinyear+1-shorten,1)
     olat[:] = tmaxnc.variables['lat'][:]
     olon[:] = tmaxnc.variables['lon'][:]
     if options.maskfile:
