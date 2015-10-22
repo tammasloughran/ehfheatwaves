@@ -276,7 +276,7 @@ if yearlyout:
     for iyear, year in enumerate(xrange(dayone.year,daylast.year)):
         if (year==daylast.year)&(season=='summer'): continue # Incomplete yr
         # Select this years season
-        allowance = 10 # For including heawave days after the end of the season
+        allowance = 50 # For including heawave days after the end of the season
         ifrom = startday + daysinyear*iyear
         ito = endday + daysinyear*iyear + allowance
         EHF_i = EHF[ifrom:ito,...]
@@ -481,7 +481,7 @@ if dailyout:
                         fill_value=-999.99)
     setattr(oends, 'long_name', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
-    otime[:] = range(1,nyears*daysinyear+1-shorten,1)
+    otime[:] = range(0,nyears*daysinyear-shorten,1)
     olat[:] = tmaxnc.variables['lat'][:]
     olon[:] = tmaxnc.variables['lon'][:]
     if options.maskfile:
