@@ -160,18 +160,22 @@ if options.maskfile:
     tmin = tmin[:,mask]
 if tminnc.variables[vname].units=='K': tmin -= 273.15
 tave_base = (tmax + tmin)/2.
-del tmin
-del tmax
+#del tmin
+#del tmax
 
 # Remove leap days in gregorian calendars
 if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
             (calendar=='standard'):
     dates_base = dates[(bpstart<=dates.year)&(dates.year<=bpend)]
     tave_base = tave_base[(dates_base.month!=2)|(dates_base.day!=29),...]
+#    tmax = tmax[(dates_base.month!=2)|(dates_base.day!=29),...]
+#    tmin = tmin[(dates_base.month!=2)|(dates_base.day!=29),...]
     del dates_base
 
 # Caclulate 90th percentile
 tpct = np.ones(((daysinyear,)+tave_base.shape[1:]))*np.nan
+txpct = tpct.copy()
+tnpct = tpct.copy()
 window = np.zeros(daysinyear,dtype=np.bool)
 wsize = 15.
 window[-np.floor(wsize/2.):] = 1
@@ -191,6 +195,8 @@ elif qtilemethod=='climpact':
     parameter = False
 for day in xrange(daysinyear):
     tpct[day,...] = percentile(tave_base[window,...], pcntl, parameter)
+#    txpct[day,...] = percentile(tmax[window,...], pcntl, parameter)
+#    tnpct[day,...] = percentile(tmin[window,...], pcntl, parameter)
     window = np.roll(window,1)
 del tave_base
 del window
@@ -212,6 +218,8 @@ del tmin
 if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
             (calendar=='standard'):
     tave = tave[(dates.month!=2)|(dates.day!=29),...]
+#    tmax = tmax[(dates.month!=2)|(dates.day!=29),...]
+#    tmin = tmin[(dates.month!=2)|(dates.day!=29),...]
 
 # Remove incomplete starting year
 first_year = dayone.year
@@ -219,6 +227,8 @@ if (dayone.month!=1)|(dayone.day!=1):
     first_year = dayone.year+1
     start = np.argmax(dates.year==first_year)
     tave = tave[start:,...]
+#    tmax = tmax[start:,...]
+#    tmin = tmin[start:,...]
 
 # Calculate EHF
 EHF = np.ones(tave.shape)*np.nan
@@ -237,7 +247,7 @@ def identify_hw(ehfs):
     # Agregate consecutive days with EHF>0
     # First day contains duration
     events = (ehfs>0.).astype(np.int)
-    for i in xrange(events.shape[0]-2,0,-1):
+    for i in xrange(events.shape[0]-2,-1,-1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
 
     # Identify when heatwaves start with duration
@@ -256,6 +266,13 @@ def identify_hw(ehfs):
     events = events.astype(np.bool)
     endss[endss<3] = 0
     return events, endss
+
+#txexceed = np.ones(tmax.shape)*np.nan
+#tnexceed = txexceed.copy()
+#for i in xrange(0,tmax.shape[0]):
+#    idoy = i-daysinyear*int((i+1)/daysinyear)
+#    txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
+#    tnexceed[i,...] = tmax[i,...]>tnpct[idoy,...]
 
 # For daily output
 if dailyout:
@@ -276,14 +293,15 @@ if yearlyout:
     for iyear, year in enumerate(xrange(dayone.year,daylast.year)):
         if (year==daylast.year)&(season=='summer'): continue # Incomplete yr
         # Select this years season
-        allowance = 50 # For including heawave days after the end of the season
-        ifrom = startday + daysinyear*iyear
+        allowance = 60 # For including heawave days after the end of the season
+        ifrom = startday + daysinyear*iyear - 1
         ito = endday + daysinyear*iyear + allowance
         EHF_i = EHF[ifrom:ito,...]
         event_i, duration_i = identify_hw(EHF_i)
-        # Remove events that start after the end of the season
-        duration_i = duration_i[:-allowance]
-        event_i = event_i[:-allowance]
+        # Remove events that start after the end of the season and before start
+        EHF_i = EHF_i[1:,...]
+        duration_i = duration_i[1:-allowance]
+        event_i = event_i[1:-allowance]
         # Calculate metrics
         HWN[iyear,...] = (duration_i>0).sum(axis=0)
         HWF[iyear,...] = duration_i.sum(axis=0)
@@ -330,7 +348,7 @@ if yearlyout:
     setattr(yearlyout, "contact", "t.loughran@student.unsw.edu.au")
     setattr(yearlyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(yearlyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
-    setattr(yearlyout, "script", "ehfheatwaves_CMIP5.py")
+    setattr(yearlyout, "script", sys.argv[0])
     if model:
         setattr(yearlyout, "model_id", model)
         setattr(yearlyout, "experiment", experiment)
@@ -441,7 +459,7 @@ if dailyout:
     setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
     setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
-    setattr(dailyout, "script", "ehfheatwaves_CMIP5.py")
+    setattr(dailyout, "script", sys.argv[0])
     setattr(dailyout, "period", "%s-%s"%(str(first_year),str(daylast.year)))
     setattr(dailyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(dailyout, "percentile", "%sth"%(str(pcntl)))
