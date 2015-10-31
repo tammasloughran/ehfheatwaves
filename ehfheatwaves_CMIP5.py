@@ -190,8 +190,9 @@ elif qtilemethod=='climpact':
     parameter = False
 for day in xrange(daysinyear):
     tpct[day,...] = percentile(tave_base[window,...], pcntl, parameter)
-    txpct[day,...] = percentile(tmax[window,...], pcntl, parameter)
-    tnpct[day,...] = percentile(tmin[window,...], pcntl, parameter)
+    if options.t90pc:
+        txpct[day,...] = percentile(tmax[window,...], pcntl, parameter)
+        tnpct[day,...] = percentile(tmin[window,...], pcntl, parameter)
     window = np.roll(window,1)
 del tave_base
 del window
@@ -206,7 +207,7 @@ if options.maskfile:
 if tmaxnc.variables[options.tmaxvname].units=='K': tmax -= 273.15
 if tminnc.variables[options.tminvname].units=='K': tmin -= 273.15
 tave = (tmax + tmin)/2.
-if not options.tx90pc:
+if not options.t90pc:
     del tmax
     del tmin
 
@@ -214,7 +215,7 @@ if not options.tx90pc:
 if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
             (calendar=='standard'):
     tave = tave[(dates.month!=2)|(dates.day!=29),...]
-    if options.tx90pc:
+    if options.t90pc:
         tmax = tmax[(dates.month!=2)|(dates.day!=29),...]
         tmin = tmin[(dates.month!=2)|(dates.day!=29),...]
 
