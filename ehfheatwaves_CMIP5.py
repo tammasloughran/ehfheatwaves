@@ -46,6 +46,8 @@ parser.add_option('-d', '--daily', action="store_true", dest='daily',
         help='output daily EHF values and heatwave indicators')
 parser.add_option('--dailyonly', action="store_true", dest='dailyonly',
         help='output only daily values and suppress yearly output')
+parser.add_option('--t90pc', action="store_true", dest='t90pc',
+                help='Calculate tx90pc and tn90pc heatwaves')
 (options, args) = parser.parse_args()
 if not options.tmaxfile or not options.tminfile:
     print "Please specify tmax and tmin files."
@@ -86,13 +88,9 @@ if not calendar:
     calendar = 'gregorian'
 elif calendar=='360_day':
     daysinyear = 360
-    seasonlen = 150
-    if season=='winter':
-        startday = 121
-        endday = 271
-    else:
-        startday = 301
-        endday = 451
+    # 360 day season start and end indices
+    SHS = (301,451)
+    SHW = (121,271)
     dayone = netcdftime.num2date(nctime[0], nctime.units,
             calendar=calendar)
     daylast = netcdftime.num2date(nctime[-1], nctime.units,
@@ -119,14 +117,9 @@ elif calendar=='360_day':
         shorten = 30*(13-daylast.month) - daylast.day
 else:
     daysinyear = 365
-    if season=='winter':
-        seasonlen = 153
-        startday = 121
-        endday = 274
-    else:
-        seasonlen = 151
-        startday = 304
-        endday = 455
+    # 365 day season start and end indices
+    SHS = (304,455)
+    SHW = (121,274)
     dayone = netcdftime.num2date(nctime[0], nctime.units,
             calendar=calendar)
     daylast = netcdftime.num2date(nctime[-1], nctime.units,
@@ -160,16 +153,18 @@ if options.maskfile:
     tmin = tmin[:,mask]
 if tminnc.variables[vname].units=='K': tmin -= 273.15
 tave_base = (tmax + tmin)/2.
-#del tmin
-#del tmax
+if not options.t90pc:
+    del tmin
+    del tmax
 
 # Remove leap days in gregorian calendars
 if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
             (calendar=='standard'):
     dates_base = dates[(bpstart<=dates.year)&(dates.year<=bpend)]
     tave_base = tave_base[(dates_base.month!=2)|(dates_base.day!=29),...]
-#    tmax = tmax[(dates_base.month!=2)|(dates_base.day!=29),...]
-#    tmin = tmin[(dates_base.month!=2)|(dates_base.day!=29),...]
+    if options.t90pc:
+        tmax = tmax[(dates_base.month!=2)|(dates_base.day!=29),...]
+        tmin = tmin[(dates_base.month!=2)|(dates_base.day!=29),...]
     del dates_base
 
 # Caclulate 90th percentile
@@ -195,31 +190,33 @@ elif qtilemethod=='climpact':
     parameter = False
 for day in xrange(daysinyear):
     tpct[day,...] = percentile(tave_base[window,...], pcntl, parameter)
-#    txpct[day,...] = percentile(tmax[window,...], pcntl, parameter)
-#    tnpct[day,...] = percentile(tmin[window,...], pcntl, parameter)
+    txpct[day,...] = percentile(tmax[window,...], pcntl, parameter)
+    tnpct[day,...] = percentile(tmin[window,...], pcntl, parameter)
     window = np.roll(window,1)
 del tave_base
 del window
 
+print "getting data"
 # Load data
 tmax = tmaxnc.variables[options.tmaxvname][:]
 tmin = tminnc.variables[options.tminvname][:]
 if options.maskfile:
     tmax = tmax[:,mask]
-if tmaxnc.variables[options.tmaxvname].units=='K': tmax -= 273.15
-if options.maskfile:
     tmin = tmin[:,mask]
+if tmaxnc.variables[options.tmaxvname].units=='K': tmax -= 273.15
 if tminnc.variables[options.tminvname].units=='K': tmin -= 273.15
 tave = (tmax + tmin)/2.
-del tmax
-del tmin
+if not options.tx90pc:
+    del tmax
+    del tmin
 
 # Remove leap days from tave
 if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
             (calendar=='standard'):
     tave = tave[(dates.month!=2)|(dates.day!=29),...]
-#    tmax = tmax[(dates.month!=2)|(dates.day!=29),...]
-#    tmin = tmin[(dates.month!=2)|(dates.day!=29),...]
+    if options.tx90pc:
+        tmax = tmax[(dates.month!=2)|(dates.day!=29),...]
+        tmin = tmin[(dates.month!=2)|(dates.day!=29),...]
 
 # Remove incomplete starting year
 first_year = dayone.year
@@ -227,8 +224,9 @@ if (dayone.month!=1)|(dayone.day!=1):
     first_year = dayone.year+1
     start = np.argmax(dates.year==first_year)
     tave = tave[start:,...]
-#    tmax = tmax[start:,...]
-#    tmin = tmin[start:,...]
+    if options.t90pc:
+        tmax = tmax[start:,...]
+        tmin = tmin[start:,...]
 
 # Calculate EHF
 EHF = np.ones(tave.shape)*np.nan
@@ -267,31 +265,52 @@ def identify_hw(ehfs):
     endss[endss<3] = 0
     return events, endss
 
-#txexceed = np.ones(tmax.shape)*np.nan
-#tnexceed = txexceed.copy()
-#for i in xrange(0,tmax.shape[0]):
-#    idoy = i-daysinyear*int((i+1)/daysinyear)
-#    txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
-#    tnexceed[i,...] = tmax[i,...]>tnpct[idoy,...]
+# Tx90pc exceedences
+if options.t90pc:
+    txexceed = np.ones(tmax.shape)*np.nan
+    tnexceed = txexceed.copy()
+    for i in xrange(0,tmax.shape[0]):
+        idoy = i-daysinyear*int((i+1)/daysinyear)
+        txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
+        tnexceed[i,...] = tmin[i,...]>tnpct[idoy,...]
+    txexceed[txexceed>0] = tmax[txexceed>0]
+    tnexceed[tnexceed>0] = tmin[tnexceed>0]
 
 # For daily output
 if dailyout:
     event, ends = identify_hw(EHF)
 
-# Calculate metrics year by year
 nyears = len(range(first_year,daylast.year+1))
-if yearlyout:
-    space = EHF.shape[1:]
-    if len(space)>1:
-        EHF = EHF.reshape(EHF.shape[0],space[0]*space[1])
+
+def hw_aspects(EHF, season, hemisphere):
+    """hw_aspects takes EHF values or temp 90pct exceedences identifies
+    heatwaves and calculates seasonal aspects.
+    """
+    # Select indices depending on calendar season and hemisphere
+    if season=='summer':
+        if hemisphere=='south':
+            startday = SHS[0]
+            endday = SHS[1]
+        else:
+            startday = SHW[0]
+            endday = SHW[1]
+    elif season=='winter':
+        if hemisphere=='south':
+            startday = SHW[0]
+            endday = SHW[1]
+        else:
+            startday = SHS[0]
+            endday = SHS[1]
+    # Initialize arrays
     HWA = np.ones(((nyears,)+(EHF.shape[1],)))*np.nan
     HWM = HWA.copy()
     HWN = HWA.copy()
     HWF = HWA.copy()
     HWD = HWA.copy()
     HWT = HWA.copy()
-    for iyear, year in enumerate(xrange(dayone.year,daylast.year)):
-        if (year==daylast.year)&(season=='summer'): continue # Incomplete yr
+    # Loop over years
+    for iyear, year in enumerate(xrange(first_year,daylast.year)):
+        if (year==daylast.year): continue # Incomplete yr
         # Select this years season
         allowance = 60 # For including heawave days after the end of the season
         ifrom = startday + daysinyear*iyear - 1
@@ -305,9 +324,12 @@ if yearlyout:
         # Calculate metrics
         HWN[iyear,...] = (duration_i>0).sum(axis=0)
         HWF[iyear,...] = duration_i.sum(axis=0)
+        HWF[iyear,HWF[iyear,...]==0] = np.nan
         HWD[iyear,...] = duration_i.max(axis=0)
+        HWT[iyear,...] = np.argmax(event_i,axis=0)
+        HWT[iyear,HWD[iyear,...]==0] = np.nan
         HWD[iyear,HWD[iyear,...]==0] = np.nan
-        # HWM and HWA must be done on each gridcell
+       # HWM and HWA must be done on each gridcell
         for x in xrange(EHF_i.shape[1]):
             hw_mag = []
             # retrieve indices where heatwaves start.
@@ -320,12 +342,80 @@ if yearlyout:
                 hw_mag.append(np.nanmean(hwdat))
             HWM[iyear,x] = np.nanmean(hw_mag)
             # Find the hottest heatwave magnitude
-            idex = np.where(hw_mag==max(hw_mag))[0]
+            idex = np.where(hw_mag==max(hw_mag))[0][0]
             # Find that heatwave's hottest day as EHF value.
             HWA[iyear,x] = EHF_i[i[idex]:i[idex]+d[idex],x].max()
-        HWT[iyear,...] = np.argmax(event_i,axis=0)
-    if len(space)>1:
-    	EHF = EHF.reshape(EHF.shape[0],space[0],space[1])
+    return HWA, HWM, HWN, HWF, HWD, HWT
+
+# Calculate metrics year by year
+def split_hemispheres(EHF):
+    """split_hemispheres splits the input data by hemispheres, and glues them
+    back together after heatwave calculations.
+    """
+    HWA_s, HWM_s, HWN_s, HWF_s, HWD_s, HWT_s = [],[],[],[],[],[]
+    HWA_n, HWM_n, HWN_n, HWF_n, HWD_n, HWT_n = [],[],[],[],[],[]
+    if south:
+        if options.maskfile:
+            EHF_s = EHF[:,:(mask[lats<=0]>0).sum()]
+        else:
+            EHF_s = EHF[:,lats<=0,...]
+        # Reshape to 2D
+        space = EHF_s.shape[1:]
+        if len(space)>1:
+            EHF_s = EHF_s.reshape(EHF_s.shape[0],space[0]*space[1])
+        # Southern hemisphere aspects
+        HWA_s, HWM_s, HWN_s, HWF_s, HWD_s, HWT_s = \
+                hw_aspects(EHF_s, season, 'south')
+        del EHF_s
+    if north:
+        if options.maskfile:
+            EHF_n = EHF[:,(mask[lats<=0]>0).sum():]
+        else:
+            EHF_n = EHF[:,lats>0,...]
+        # Reshape to 2D
+        space = EHF_n.shape[1:]
+        if len(space)>1:
+            EHF_n = EHF_s.reshape(EHF_n.shape[0],space[0]*space[1])
+        # Northern hemisphere aspects
+        HWA_n, HWM_n, HWN_n, HWF_n, HWD_n, HWT_n = \
+                hw_aspects(EHF_n, season, 'north')
+        del EHF_n
+    # Glue hemispheres back together
+    if north and south:
+        HWA = np.append(HWA_s, HWA_n, axis=1)
+        HWM = np.append(HWM_s, HWM_n, axis=1)
+        HWN = np.append(HWN_s, HWN_n, axis=1)
+        HWF = np.append(HWF_s, HWF_n, axis=1)
+        HWD = np.append(HWD_s, HWD_n, axis=1)
+        HWT = np.append(HWT_s, HWT_n, axis=1)
+    elif north:
+        HWA = HWA_n
+        HWM = HWM_n
+        HWN = HWN_n
+        HWF = HWF_n
+        HWD = HWD_n
+        HWT = HWT_n
+    elif south:
+        HWA = HWA_s
+        HWM = HWM_s
+        HWN = HWN_s
+        HWF = HWF_s
+        HWD = HWD_s
+        HWT = HWT_s
+    return HWA, HWM, HWN, HWF, HWD, HWT
+
+if yearlyout:
+    # Split by latitude
+    lats = tmaxnc.variables['lat'][:]
+    north = (lats>0).any()
+    south = (lats<=0).any()
+    HWA_EHF, HWM_EHF, HWN_EHF, HWF_EHF, HWD_EHF, HWT_EHF = \
+            split_hemispheres(EHF)
+    if options.t90pc:
+        HWA_tx, HWM_tx, HWN_tx, HWF_tx, HWD_tx, HWT_tx = \
+                split_hemispheres(txexceed)
+        HWA_tn, HWM_tn, HWN_tn, HWF_tn, HWD_tn, HWT_tn = \
+                split_hemispheres(tnexceed)
 
 # Save to netCDF
 try:
@@ -336,8 +426,9 @@ except AttributeError:
     experiment = ''
     model = ''
     realization = ''
-if yearlyout:
-    yearlyout = Dataset('EHF_heatwaves_%s_%s_r%s_yearly_%s.nc'%(model, 
+space = (tmaxnc.dimensions['lat'].__len__(),tmaxnc.dimensions['lon'].__len__())
+def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):    
+    yearlyout = Dataset('%s_heatwaves_%s_%s_r%s_yearly_%s.nc'%(definition, model, 
             experiment, realization, season), mode='w')
     yearlyout.createDimension('time', len(range(first_year,
             daylast.year+1)))
@@ -448,6 +539,11 @@ if yearlyout:
         HWDout[:] = HWD.reshape((nyears,)+space)
         HWTout[:] = HWT.reshape((nyears,)+space)
     yearlyout.close()
+if yearlyout:
+    save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,"EHF")
+    if options.t90pc:
+        save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,"tx90pc")
+        save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,"tn90pc")
 
 if dailyout:
     dailyout = Dataset('EHF_heatwaves_%s_%s_r%s_daily.nc'\
