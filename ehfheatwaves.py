@@ -120,9 +120,15 @@ else:
     # 365 day season start and end indices
     SHS = (304,455)
     SHW = (121,274)
-    dayone = netcdftime.num2date(nctime[0], nctime.units,
+    if tmaxnc.variables['time'].units=='day as %Y%m%d.%f':
+        st = str(int(nctime[0]))
+        nd = str(int(nctime[-1]))
+        dayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
+        daylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(st[6:]))
+    else:
+        dayone = netcdftime.num2date(nctime[0], nctime.units,
             calendar=calendar)
-    daylast = netcdftime.num2date(nctime[-1], nctime.units,
+        daylast = netcdftime.num2date(nctime[-1], nctime.units,
             calendar=calendar)
     dates = pd.date_range(str(dayone), str(daylast))
     shorten = 0
@@ -197,7 +203,6 @@ for day in xrange(daysinyear):
 del tave_base
 del window
 
-print "getting data"
 # Load data
 tmax = tmaxnc.variables[options.tmaxvname][:]
 tmin = tminnc.variables[options.tminvname][:]
@@ -353,8 +358,6 @@ def split_hemispheres(EHF):
     """split_hemispheres splits the input data by hemispheres, and glues them
     back together after heatwave calculations.
     """
-    HWA_s, HWM_s, HWN_s, HWF_s, HWD_s, HWT_s = [],[],[],[],[],[]
-    HWA_n, HWM_n, HWN_n, HWF_n, HWD_n, HWT_n = [],[],[],[],[],[]
     if south:
         if options.maskfile:
             EHF_s = EHF[:,:(mask[lats<=0]>0).sum()]
@@ -428,6 +431,7 @@ except AttributeError:
     model = ''
     realization = ''
 space = (tmaxnc.dimensions['lat'].__len__(),tmaxnc.dimensions['lon'].__len__())
+
 def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):    
     yearlyout = Dataset('%s_heatwaves_%s_%s_r%s_yearly_%s.nc'%(definition, model, 
             experiment, realization, season), mode='w')
@@ -448,19 +452,22 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
     setattr(yearlyout, "period", "%s-%s"%(str(first_year),str(daylast.year)))
     setattr(yearlyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(yearlyout, "percentile", "%sth"%(str(pcntl)))
+    setattr(yearlyout, "definition", definition)
     setattr(yearlyout, "frequency", "yearly")
     setattr(yearlyout, "season", season)
-    if season=='summer':
-        definition = 'Nov-Mar'
-    elif season=='winter':
-        definition = 'May-Sep'
     setattr(yearlyout, "definition", definition)
-    setattr(yearlyout, "season_note", "The year of a season is the year it starts in")
-    setattr(yearlyout, "git_commit", subprocess.check_output(['git', 'rev-parse', 'HEAD']))
+    setattr(yearlyout, "season_note", "The year of a season is the year it starts in. SH summer: Nov-Mar. NH summer: May-Sep.")
+    try:
+        file = open('version', 'r')
+        commit = file.read()[:-2]
+    except IOError:
+        commit = "Unknown. Check date for latest version."
+    setattr(yearlyout, "git_commit", commit)
     setattr(yearlyout, "tmax_file", options.tmaxfile)
     setattr(yearlyout, "tmin_file", options.tminfile)
     if options.maskfile:
         setattr(yearlyout, "mask_file", options.maskfile)
+    setattr(yearlyout, "quantile_method", options.qtilemethod)
     otime = yearlyout.createVariable('time', 'f8', 'time', 
             fill_value=-999.99)
     setattr(otime, 'units', 'year')
@@ -480,33 +487,43 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
     setattr(otpct, 'units', 'degC')
     setattr(otpct, 'description', 
             '90th percentile of %s-%s'%(str(bpstart),str(bpend)))
-    HWAout = yearlyout.createVariable('HWA_EHF', 'f8', ('time','lat','lon'), 
+    HWAout = yearlyout.createVariable('HWA_%s'%(definition), 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
     setattr(HWAout, 'long_name', 'Heatwave Amplitude')
-    setattr(HWAout, 'units', 'degC2')
+    if definition=='tx90pct':
+        setattr(HWAout, 'units', 'degC')
+    elif definition=='tn90pct':
+        setattr(HWAout, 'units', 'degC')
+    elif definition=='EHF':
+        setattr(HWAout, 'units', 'degC2')
     setattr(HWAout, 'description', 
             'Peak of the hottest heatwave per year')
-    HWMout = yearlyout.createVariable('HWM_EHF', 'f8', ('time','lat','lon'),
+    HWMout = yearlyout.createVariable('HWM_%s'%(definition), 'f8', ('time','lat','lon'),
             fill_value=-999.99)
     setattr(HWMout, 'long_name', 'Heatwave Magnitude')
-    setattr(HWMout, 'units', 'degC2')
+    if definition=='tx90pct':
+        setattr(HWAout, 'units', 'degC')
+    elif definition=='tn90pct':
+        setattr(HWAout, 'units', 'degC')
+    elif definition=='EHF':
+        setattr(HWAout, 'units', 'degC2')
     setattr(HWMout, 'description', 'Average magnitude of the yearly heatwave')
-    HWNout = yearlyout.createVariable('HWN_EHF', 'f8', ('time', 'lat', 'lon'), 
+    HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8', ('time', 'lat', 'lon'), 
             fill_value=-999.99)
     setattr(HWNout, 'long_name', 'Heatwave Number')
     setattr(HWNout, 'units','')
     setattr(HWNout, 'description', 'Number of heatwaves per year')
-    HWFout = yearlyout.createVariable('HWF_EHF', 'f8', ('time','lat','lon'), 
+    HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
     setattr(HWFout, 'long_name','Heatwave Frequency')
     setattr(HWFout, 'units', 'days')
     setattr(HWFout, 'description', 'Proportion of heatwave days per season')
-    HWDout = yearlyout.createVariable('HWD_EHF', 'f8', ('time','lat','lon'), 
+    HWDout = yearlyout.createVariable('HWD_%s'%(definition), 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
     setattr(HWDout, 'long_name', 'Heatwave Duration')
     setattr(HWDout, 'units', 'days')
     setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
-    HWTout = yearlyout.createVariable('HWT_EHF', 'f8', ('time','lat','lon'), 
+    HWTout = yearlyout.createVariable('HWT_%s'%(definition), 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
     setattr(HWTout, 'long_name', 'Heatwave Timing')
     setattr(HWTout, 'units', 'days from strat of season')
@@ -540,11 +557,12 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
         HWDout[:] = HWD.reshape((nyears,)+space)
         HWTout[:] = HWT.reshape((nyears,)+space)
     yearlyout.close()
+
 if yearlyout:
     save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,"EHF")
     if options.t90pc:
-        save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,"tx90pc")
-        save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,"tn90pc")
+        save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,"tx90pct")
+        save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,"tn90pct")
 
 if dailyout:
     dailyout = Dataset('EHF_heatwaves_%s_%s_r%s_daily.nc'\
@@ -564,11 +582,17 @@ if dailyout:
         setattr(dailyout, "model_id", model)
         setattr(dailyout, "experiment", experiment)
         setattr(dailyout, "realization", realization)
-    setattr(dailyout, "git_commit", subprocess.check_output(['git', 'rev-parse', 'HEAD']))
+    try:
+        file = open('version', 'r')
+        commit = file.read()[:-2]
+    except IOError:
+        commit = "Unknown. Check date for latest version."
+    setattr(dailyout, "git_commit", commit)
     setattr(dailyout, "tmax_file", options.tmaxfile)
     setattr(dailyout, "tmin_file", options.tminfile)
     if options.maskfile:
         setattr(dailyout, "mask_file", str(options.maskfile))
+    setattr(dailyout, "quantile_method", options.qtilemethod)
     otime = dailyout.createVariable('time', 'f8', 'time',
                     fill_value=-999.99)
     setattr(otime, 'units', 'days since %s-01-01'%(first_year))
