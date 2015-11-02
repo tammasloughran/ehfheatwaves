@@ -69,3 +69,4 @@ This script is not parallelized.
 
 To do list:
  * Save EHIs to file
+ * Use standard metadata conventions
