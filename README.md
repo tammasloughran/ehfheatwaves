@@ -6,7 +6,7 @@ heatwave indicators for any season rather than just annual or seasonal
 heatwave aspects. The script has been improved to handle CMIP5 quirks 
 such different calendars.
 
-Usage: ehfheatwaves_CMIP5.py -x <FILE> -n <FILE> -m <FILE> [options]
+Usage: ehfheatwaves.py -x <FILE> -n <FILE> -m <FILE> [options]
 
 Options:
   -h, --help            show this help message and exit
@@ -24,6 +24,7 @@ Options:
                         quantile interpolation method. Default is climpact
   -d, --daily           output daily EHF values and heatwave indicators
   --dailyonly           output only daily values and suppress yearly output
+  --t90pc               Calculate tx90pc and tn90pc heatwaves
 
 Required packages (prefereably the latest versions)
  * numpy
@@ -33,18 +34,38 @@ Required packages (prefereably the latest versions)
  * netcdftime
  * optparse
 
+Notes:
+
 You must provide a tasmax file, tasmin file and a land sea mask. 
 e.g. 
-python ehfheatwaves_CMIP5.py -x "/direcory/tasmax_*" -n "/direcory/tasmin_*" -m "/direcory/mask.nc" -d
+python ehfheatwaves.py -x "/direcory/tasmax_*" -n "/direcory/tasmin_*" -m "/direcory/mask.nc" -d
 Make sure to use quotes if specifying multiple files with wild cards
 
 Be careful when using the -d flag. This writes daily output of EHF values 
-and heatwave indicators. During processing, unused data are removed using
-the mask. When saving, this data need to be placed back into a very large
-gridded array. This takes up a lot of ram ~30-40GB, so make sure that you
-have enough ram.
+and heatwave indicators to a sepatate file. During processing, unused data 
+are removed using the mask. When saving, this data need to be placed back 
+into a very large gridded array. This takes up a lot of ram ~30-40GB, so 
+make sure that you have enough ram.
+
+TX90pct and TN90pct heatwaves are also available. Only the seasonal aspects are 
+available for now, no daily values. These will be output to separate files.
+
+Global datasets are treated differently depending on which hemisphere the 
+data are in. The data are split by hemispheres, and summer heatwaves are
+calculated for the summer of that hemisphere. Heatwaves that are close to 
+the equator should be cautiously considered. There is a discontinuity of 
+season at the equator, with values at latitude 0 treated as part of the
+southern hemisphere. Additionaly, there is little seasonal variation in 90th 
+percentile in the tropics and is sometimes somewhat bimodal. This raises 
+questions about the intepretation of tropical heatwaves using these definitions.
+Bear this in mind.
+
+The output file names are automatically generated for the time being. If your 
+input dataset does not have any metadata about which model simulation it is, 
+then the filename will contain underscores. For the time being just manually rename
+the file to reflect the input dataset. Ill deal with this soon. 
+
+This script is not parallelized.
 
 To do list:
  * Save EHIs to file
- * Calculate heatwaves based on TX90pct
- * Save HWA using temp rather than the EHF
