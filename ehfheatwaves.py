@@ -30,6 +30,8 @@ parser.add_option('-m', '--mask', dest='maskfile',
         help='file containing land-sea mask', metavar='FILE')
 parser.add_option('--vnamem', dest='maskvname', default='sftlf',
         help='mask variable name', metavar='STR')
+parser.add_option('--vnamet', dest='timevname', default='time',
+                help='time variable name', metavar='STR')
 parser.add_option('-s', '--season', dest='season', default='summer',
         help='austal season for annual metrics. Defaults to austral summer',
         metavar='STR')
@@ -81,7 +83,7 @@ try:
     tmaxnc = MFDataset(options.tmaxfile, 'r')
 except IndexError:
     tmaxnc = Dataset(options.tmaxfile, 'r')
-nctime = tmaxnc.variables['time']
+nctime = tmaxnc.variables[options.timevname]
 calendar = nctime.calendar
 if not calendar:
     print 'Unrecognized calendar. Using gregorian.'
@@ -120,7 +122,7 @@ else:
     # 365 day season start and end indices
     SHS = (304,455)
     SHW = (121,274)
-    if tmaxnc.variables['time'].units=='day as %Y%m%d.%f':
+    if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
         st = str(int(nctime[0]))
         nd = str(int(nctime[-1]))
         dayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
@@ -148,6 +150,7 @@ if options.maskfile:
 # Load base period data
 vname = options.tmaxvname
 tmax = tmaxnc.variables[vname][(bpstart<=dates.year)&(dates.year<=bpend)]
+if len(tmax.shape)==4: tmax = tmax.squeeze()
 original_shape = tmax.shape
 if options.maskfile:
     tmax = tmax[:,mask]
@@ -155,6 +158,7 @@ if tmaxnc.variables[vname].units=='K': tmax -= 273.15
 tminnc = MFDataset(options.tminfile, 'r')
 vname = options.tminvname
 tmin = tminnc.variables[vname][(bpstart<=dates.year)&(dates.year<=bpend)]
+if len(tmin.shape)==4: tmin = tmin.squeeze()
 if options.maskfile:
     tmin = tmin[:,mask]
 if tminnc.variables[vname].units=='K': tmin -= 273.15
@@ -205,7 +209,9 @@ del window
 
 # Load data
 tmax = tmaxnc.variables[options.tmaxvname][:]
+if len(tmax.shape)==4: tmax = tmax.squeeze()
 tmin = tminnc.variables[options.tminvname][:]
+if len(tmin.shape)==4: tmin = tmin.squeeze()
 if options.maskfile:
     tmax = tmax[:,mask]
     tmin = tmin[:,mask]
@@ -410,7 +416,10 @@ def split_hemispheres(EHF):
 
 if yearlyout:
     # Split by latitude
-    lats = tmaxnc.variables['lat'][:]
+    try:
+        lats = tmaxnc.variables['lat'][:]
+    except KeyError:
+        lats = tmaxnc.variables['latitude'][:]
     north = (lats>0).any()
     south = (lats<=0).any()
     HWA_EHF, HWM_EHF, HWN_EHF, HWF_EHF, HWD_EHF, HWT_EHF = \
@@ -430,15 +439,22 @@ except AttributeError:
     experiment = ''
     model = ''
     realization = ''
-space = (tmaxnc.dimensions['lat'].__len__(),tmaxnc.dimensions['lon'].__len__())
+try:
+    space = (tmaxnc.dimensions['lat'].__len__(),tmaxnc.dimensions['lon'].__len__())
+    lonname = 'lon'
+    latname = 'lat'
+except KeyError:
+    lonname = 'longitude'
+    latname = 'latitude'
+    space = (tmaxnc.dimensions['latitude'].__len__(),tmaxnc.dimensions['longitude'].__len__())
 
 def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):    
     yearlyout = Dataset('%s_heatwaves_%s_%s_r%s_yearly_%s.nc'%(definition, model, 
             experiment, realization, season), mode='w')
     yearlyout.createDimension('time', len(range(first_year,
             daylast.year+1)))
-    yearlyout.createDimension('lon', tmaxnc.dimensions['lon'].__len__())
-    yearlyout.createDimension('lat', tmaxnc.dimensions['lat'].__len__())
+    yearlyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
+    yearlyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
     yearlyout.createDimension('day', daysinyear)
     setattr(yearlyout, "author", "Tammas Loughran")
     setattr(yearlyout, "contact", "t.loughran@student.unsw.edu.au")
@@ -529,8 +545,8 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
     setattr(HWTout, 'units', 'days from strat of season')
     setattr(HWTout, 'description', 'First heat wave day of the season')
     otime[:] = range(first_year, daylast.year+1)
-    olat[:] = tmaxnc.variables['lat'][:]
-    olon[:] = tmaxnc.variables['lon'][:]
+    olat[:] = tmaxnc.variables[latname][:]
+    olon[:] = tmaxnc.variables[lonname][:]
     dummy_array = np.ones((daysinyear,)+original_shape[1:])*np.nan
     if options.maskfile:
         dummy_array[:,mask] = tpct
@@ -568,8 +584,8 @@ if dailyout:
     dailyout = Dataset('EHF_heatwaves_%s_%s_r%s_daily.nc'\
             %(model, experiment, realization), mode='w')
     dailyout.createDimension('time', EHF.shape[0])
-    dailyout.createDimension('lon', tmaxnc.dimensions['lon'].__len__())
-    dailyout.createDimension('lat', tmaxnc.dimensions['lat'].__len__())
+    dailyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
+    dailyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
     setattr(dailyout, "author", "Tammas Loughran")
     setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
     setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
@@ -621,8 +637,8 @@ if dailyout:
     setattr(oends, 'long_name', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
     otime[:] = range(0,nyears*daysinyear-shorten,1)
-    olat[:] = tmaxnc.variables['lat'][:]
-    olon[:] = tmaxnc.variables['lon'][:]
+    olat[:] = tmaxnc.variables[latname][:]
+    olon[:] = tmaxnc.variables[lonname][:]
     if options.maskfile:
         dummy_array = np.ones((EHF.shape[0],)+original_shape[1:])*np.nan
         dummy_array[:,mask] = EHF
