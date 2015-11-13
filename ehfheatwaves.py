@@ -26,6 +26,14 @@ parser.add_option('-n', '--tmin', dest='tminfile',
         help='file containing tmin', metavar='FILE')
 parser.add_option('--vnamen', dest='tminvname', default='tasmin',
         help='tmin variable name', metavar='STR')
+parser.add_option('--bpfx', dest='bpfx',
+                help=('Indicates a future simulation, specifying a tmax file '
+                'containing the historical base period to be used'),
+                metavar='FILE')
+parser.add_option('--bpfn', dest='bpfn',
+                help=('Indicates a future simulation, specifying a tmin file '
+                'containing the historical base period to be used'),
+                metavar='FILE')
 parser.add_option('-m', '--mask', dest='maskfile',
         help='file containing land-sea mask', metavar='FILE')
 parser.add_option('--vnamem', dest='maskvname', default='sftlf',
@@ -144,12 +152,30 @@ if options.maskfile:
     masknc = Dataset(options.maskfile, 'r')
     vname = options.maskvname
     mask = masknc.variables[vname][:]
+    if mask.max()>1: mask = mask>50
     mask = mask.astype(np.bool)
     masknc.close()
 
 # Load base period data
+if options.bpfn:
+    try:
+        tminnc = MFDataset(options.bpfn, 'r')
+    except IndexError:
+        tminnc = Dataset(options.bpfn, 'r')
+if options.bpfx:
+    try:
+        tmaxnc = MFDataset(options.bpfx, 'r')
+    except IndexError:
+        tmaxnc = Dataset(options.bpfx, 'r')
 vname = options.tmaxvname
-tmax = tmaxnc.variables[vname][(bpstart<=dates.year)&(dates.year<=bpend)]
+bptime = tmaxnc.variables[options.timevname]
+bpdayone = netcdftime.num2date(bptime[0], bptime.units, calendar=calendar)
+bpdaylast = netcdftime.num2date(bptime[-1], bptime.units, calendar=calendar)
+if calendar=='360_day': bpdates = calendar360(dayone, daylast)
+else: bpdates = pd.date_range(str(dayone), str(daylast))
+dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
+bpdates = pd.date_range(str(dayone), str(daylast))
+tmax = tmaxnc.variables[vname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 if len(tmax.shape)==4: tmax = tmax.squeeze()
 original_shape = tmax.shape
 if options.maskfile:
@@ -157,7 +183,7 @@ if options.maskfile:
 if tmaxnc.variables[vname].units=='K': tmax -= 273.15
 tminnc = MFDataset(options.tminfile, 'r')
 vname = options.tminvname
-tmin = tminnc.variables[vname][(bpstart<=dates.year)&(dates.year<=bpend)]
+tmin = tminnc.variables[vname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 if len(tmin.shape)==4: tmin = tmin.squeeze()
 if options.maskfile:
     tmin = tmin[:,mask]
@@ -170,7 +196,6 @@ if not options.t90pc:
 # Remove leap days in gregorian calendars
 if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
             (calendar=='standard'):
-    dates_base = dates[(bpstart<=dates.year)&(dates.year<=bpend)]
     tave_base = tave_base[(dates_base.month!=2)|(dates_base.day!=29),...]
     if options.t90pc:
         tmax = tmax[(dates_base.month!=2)|(dates_base.day!=29),...]
@@ -208,6 +233,14 @@ del tave_base
 del window
 
 # Load data
+try:
+    tminnc = MFDataset(options.tminfile, 'r')
+except IndexError:
+    tminnc = Dataset(options.tminfile, 'r')
+try:
+    tmaxxc = MFDataset(options.tmaxfile, 'r')
+except IndexError:
+    tmaxxc = Dataset(options.tminfile, 'r')
 tmax = tmaxnc.variables[options.tmaxvname][:]
 if len(tmax.shape)==4: tmax = tmax.squeeze()
 tmin = tminnc.variables[options.tminvname][:]
@@ -434,7 +467,7 @@ if yearlyout:
 try:
     experiment = tmaxnc.__getattribute__('experiment')
     model = tmaxnc.__getattribute__('model_id')
-    realization = tmaxnc.__getattribute__('realization')
+    realization = tmaxnc.__getattribute__('parent_experiment_rip')
 except AttributeError:
     experiment = ''
     model = ''
@@ -449,7 +482,7 @@ except KeyError:
     space = (tmaxnc.dimensions['latitude'].__len__(),tmaxnc.dimensions['longitude'].__len__())
 
 def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):    
-    yearlyout = Dataset('%s_heatwaves_%s_%s_r%s_yearly_%s.nc'%(definition, model, 
+    yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, model, 
             experiment, realization, season), mode='w')
     yearlyout.createDimension('time', len(range(first_year,
             daylast.year+1)))
@@ -581,7 +614,7 @@ if yearlyout:
         save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,"tn90pct")
 
 if dailyout:
-    dailyout = Dataset('EHF_heatwaves_%s_%s_r%s_daily.nc'\
+    dailyout = Dataset('EHF_heatwaves_%s_%s_%s_daily.nc'\
             %(model, experiment, realization), mode='w')
     dailyout.createDimension('time', EHF.shape[0])
     dailyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
