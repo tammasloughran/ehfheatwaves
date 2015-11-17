@@ -169,8 +169,14 @@ if options.bpfx:
         tmaxnc = Dataset(options.bpfx, 'r')
 vname = options.tmaxvname
 bptime = tmaxnc.variables[options.timevname]
-bpdayone = netcdftime.num2date(bptime[0], bptime.units, calendar=calendar)
-bpdaylast = netcdftime.num2date(bptime[-1], bptime.units, calendar=calendar)
+if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
+    st = str(int(bptime[0]))
+    nd = str(int(bptime[-1]))
+    bpdayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
+    bpdaylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(st[6:]))
+else:
+    bpdayone = netcdftime.num2date(bptime[0], bptime.units, calendar=calendar)
+    bpdaylast = netcdftime.num2date(bptime[-1], bptime.units, calendar=calendar)
 if calendar=='360_day': bpdates = calendar360(dayone, daylast)
 else: bpdates = pd.date_range(str(dayone), str(daylast))
 dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
