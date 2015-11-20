@@ -1,19 +1,31 @@
 import warnings
 warnings.filterwarnings('ignore')
 import sys
-try: 
+try:
+    modulename = 'pandas'
     import pandas as pd
+    modulename = 'numpy'
+    import numpy as np
+    modulename = 'datetime'
+    import datetime as dt
+    modulename = 'math'
+    import math
+    modulename = 'qtiler'
+    import qtiler
+    modulename = 'netCDF4'
+    from netCDF4 import MFDataset, Dataset
+    modulename = 'netcdftime'
+    import netcdftime
+    modulename = 'optparse'
+    from optparse import OptionParser
+    modulename = 'distutils.version'
+    from distutils.version import LooseVersion
 except ImportError:
-    print "Please install pandas"
+    print modulename, " is missing. Please install missing packages."
     sys.exit(2)
-import numpy as np
-import datetime as dt
-import math
-import qtiler
-from netCDF4 import MFDataset, Dataset
-import netcdftime
-from optparse import OptionParser
-import subprocess
+if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
+    print "Please install numpy version 1.8.0 or higher."
+    sys.exit(2)
 
 # Parse command line arguments
 usage = "usage: %prog -x <FILE> -n <FILE> -m <FILE> [options]"
@@ -63,7 +75,8 @@ if not options.tmaxfile or not options.tminfile:
     print "Please specify tmax and tmin files."
     sys.exit(2)
 if not options.maskfile:
-    print "You didn't specify a land-sea mask. It's faster if you do, so this might take a while."
+    print ("You didn't specify a land-sea mask. It's faster if you do,"
+        "so this might take a while.")
 if len(options.bp)!=9:
     print "Incorect base period format."
     sys.exit(2)
@@ -77,7 +90,7 @@ qtilemethod = options.qtilemethod
 # season (winter/summer)
 season = options.season
 if (season!='summer')&(season!='winter'):
-    print "Use either summer or winter. (Austral)"
+    print "Use either summer or winter."
     sys.exit(2)
 # save daily EHF output
 yearlyout = True
@@ -86,7 +99,7 @@ if options.dailyonly:
     dailyout = True
     yearlyout = False
 
-# Load data
+# Load time data
 try:
     tmaxnc = MFDataset(options.tmaxfile, 'r')
 except IndexError:
@@ -134,7 +147,7 @@ else:
         st = str(int(nctime[0]))
         nd = str(int(nctime[-1]))
         dayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
-        daylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(st[6:]))
+        daylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(nd[6:]))
     else:
         dayone = netcdftime.num2date(nctime[0], nctime.units,
             calendar=calendar)
@@ -173,21 +186,21 @@ if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
     st = str(int(bptime[0]))
     nd = str(int(bptime[-1]))
     bpdayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
-    bpdaylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(st[6:]))
+    bpdaylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(nd[6:]))
 else:
     bpdayone = netcdftime.num2date(bptime[0], bptime.units, calendar=calendar)
     bpdaylast = netcdftime.num2date(bptime[-1], bptime.units, calendar=calendar)
 if calendar=='360_day': bpdates = calendar360(dayone, daylast)
-else: bpdates = pd.date_range(str(dayone), str(daylast))
+else: bpdates = pd.date_range(str(bpdayone), str(bpdaylast))
 dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
-bpdates = pd.date_range(str(dayone), str(daylast))
+#bpdates = pd.date_range(str(dayone), str(daylast))
 tmax = tmaxnc.variables[vname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 if len(tmax.shape)==4: tmax = tmax.squeeze()
 original_shape = tmax.shape
 if options.maskfile:
     tmax = tmax[:,mask]
 if tmaxnc.variables[vname].units=='K': tmax -= 273.15
-tminnc = MFDataset(options.tminfile, 'r')
+#tminnc = MFDataset(options.tminfile, 'r')
 vname = options.tminvname
 tmin = tminnc.variables[vname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 if len(tmin.shape)==4: tmin = tmin.squeeze()
@@ -238,15 +251,15 @@ for day in xrange(daysinyear):
 del tave_base
 del window
 
-# Load data
+# Load all data
 try:
     tminnc = MFDataset(options.tminfile, 'r')
 except IndexError:
     tminnc = Dataset(options.tminfile, 'r')
 try:
-    tmaxxc = MFDataset(options.tmaxfile, 'r')
+    tmaxnc = MFDataset(options.tmaxfile, 'r')
 except IndexError:
-    tmaxxc = Dataset(options.tminfile, 'r')
+    tmaxnc = Dataset(options.tminfile, 'r')
 tmax = tmaxnc.variables[options.tmaxvname][:]
 if len(tmax.shape)==4: tmax = tmax.squeeze()
 tmin = tminnc.variables[options.tminvname][:]
@@ -375,7 +388,6 @@ def hw_aspects(EHF, season, hemisphere):
         # Calculate metrics
         HWN[iyear,...] = (duration_i>0).sum(axis=0)
         HWF[iyear,...] = duration_i.sum(axis=0)
-        HWF[iyear,HWF[iyear,...]==0] = np.nan
         HWD[iyear,...] = duration_i.max(axis=0)
         HWT[iyear,...] = np.argmax(event_i,axis=0)
         HWT[iyear,HWD[iyear,...]==0] = np.nan
@@ -511,7 +523,8 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
     setattr(yearlyout, "frequency", "yearly")
     setattr(yearlyout, "season", season)
     setattr(yearlyout, "definition", definition)
-    setattr(yearlyout, "season_note", "The year of a season is the year it starts in. SH summer: Nov-Mar. NH summer: May-Sep.")
+    setattr(yearlyout, "season_note", ("The year of a season is the year it starts"
+            "in. SH summer: Nov-Mar. NH summer: May-Sep."))
     try:
         file = open('version', 'r')
         commit = file.read()[:-2]
@@ -589,19 +602,26 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
     dummy_array = np.ones((daysinyear,)+original_shape[1:])*np.nan
     if options.maskfile:
         dummy_array[:,mask] = tpct
+        dummy_array[np.isnan(dummy_array)] = -999.99
         otpct[:] = dummy_array.copy()
         dummy_array = np.ones((nyears,)+original_shape[1:])*np.nan
         dummy_array[:,mask] = HWA
+        dummy_array[np.isnan(dummy_array)] = -999.99
         HWAout[:] = dummy_array.copy()
         dummy_array[:,mask] = HWM
+        dummy_array[np.isnan(dummy_array)] = -999.99
         HWMout[:] = dummy_array.copy()
         dummy_array[:,mask] = HWN
+        dummy_array[np.isnan(dummy_array)] = -999.99
         HWNout[:] = dummy_array.copy()
         dummy_array[:,mask] = HWF
+        dummy_array[np.isnan(dummy_array)] = -999.99
         HWFout[:] = dummy_array.copy()
         dummy_array[:,mask] = HWD
+        dummy_array[np.isnan(dummy_array)] = -999.99
         HWDout[:] = dummy_array.copy() 
         dummy_array[:,mask] = HWT
+        dummy_array[np.isnan(dummy_array)] = -999.99
         HWTout[:] = dummy_array.copy()
     else:
         otpct[:] = tpct
@@ -681,10 +701,13 @@ if dailyout:
     if options.maskfile:
         dummy_array = np.ones((EHF.shape[0],)+original_shape[1:])*np.nan
         dummy_array[:,mask] = EHF
+        dummy_array[np.isnan(dummy_array)] = -999.99
         oehf[:] = dummy_array.copy()
         dummy_array[:,mask] = event
+        dummy_array[np.isnan(dummy_array)] = -999.99
         oevent[:] = dummy_array.copy()
         dummy_array[:,mask] = ends
+        dummy_array[np.isnan(dummy_array)] = -999.99
         oends[:] = dummy_array.copy()
     else:
         oehf[:] = EHF
