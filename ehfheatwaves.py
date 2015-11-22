@@ -579,7 +579,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
     HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8', ('time', 'lat', 'lon'), 
             fill_value=-999.99)
     setattr(HWNout, 'long_name', 'Heatwave Number')
-    setattr(HWNout, 'units','')
+    setattr(HWNout, 'units','heatwaves')
     setattr(HWNout, 'description', 'Number of heatwaves per year')
     HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8', ('time','lat','lon'), 
             fill_value=-999.99)
