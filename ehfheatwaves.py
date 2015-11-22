@@ -175,11 +175,21 @@ if options.bpfn:
         tminnc = MFDataset(options.bpfn, 'r')
     except IndexError:
         tminnc = Dataset(options.bpfn, 'r')
+else:
+    try:
+        tminnc = MFDataset(options.tminfile, 'r')
+    except IndexError:
+        tminnc = Dataset(options.tminfile, 'r')
 if options.bpfx:
     try:
         tmaxnc = MFDataset(options.bpfx, 'r')
     except IndexError:
         tmaxnc = Dataset(options.bpfx, 'r')
+else:
+    try:
+        tmaxnc = MFDataset(options.tmaxfile, 'r')
+    except IndexError:
+        tmaxnc = Dataset(options.tmaxfile, 'r')
 vname = options.tmaxvname
 bptime = tmaxnc.variables[options.timevname]
 if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
@@ -193,14 +203,12 @@ else:
 if calendar=='360_day': bpdates = calendar360(dayone, daylast)
 else: bpdates = pd.date_range(str(bpdayone), str(bpdaylast))
 dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
-#bpdates = pd.date_range(str(dayone), str(daylast))
 tmax = tmaxnc.variables[vname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 if len(tmax.shape)==4: tmax = tmax.squeeze()
 original_shape = tmax.shape
 if options.maskfile:
     tmax = tmax[:,mask]
 if tmaxnc.variables[vname].units=='K': tmax -= 273.15
-#tminnc = MFDataset(options.tminfile, 'r')
 vname = options.tminvname
 tmin = tminnc.variables[vname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 if len(tmin.shape)==4: tmin = tmin.squeeze()
@@ -705,9 +713,11 @@ if dailyout:
         oehf[:] = dummy_array.copy()
         dummy_array[:,mask] = event
         dummy_array[np.isnan(dummy_array)] = -999.99
+        dummy_array[:31,...] = -999.99
         oevent[:] = dummy_array.copy()
         dummy_array[:,mask] = ends
         dummy_array[np.isnan(dummy_array)] = -999.99
+        dummy_array[:31,...] = -999.99
         oends[:] = dummy_array.copy()
     else:
         oehf[:] = EHF
