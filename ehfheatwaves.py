@@ -201,8 +201,9 @@ else:
     bpdayone = netcdftime.num2date(bptime[0], bptime.units, calendar=calendar)
     bpdaylast = netcdftime.num2date(bptime[-1], bptime.units, calendar=calendar)
 if calendar=='360_day': bpdates = calendar360(dayone, daylast)
-else: bpdates = pd.date_range(str(bpdayone), str(bpdaylast))
-dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
+else: 
+    bpdates = pd.date_range(str(bpdayone), str(bpdaylast))
+    dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 tmax = tmaxnc.variables[vname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 if len(tmax.shape)==4: tmax = tmax.squeeze()
 original_shape = tmax.shape
