@@ -13,7 +13,7 @@ try:
     modulename = 'qtiler'
     import qtiler
     modulename = 'netCDF4'
-    from netCDF4 import MFDataset, Dataset
+    from netCDF4 import MFDataset, MFTime, Dataset
     modulename = 'netcdftime'
     import netcdftime
     modulename = 'optparse'
@@ -105,6 +105,10 @@ try:
 except IndexError:
     tmaxnc = Dataset(options.tmaxfile, 'r')
 nctime = tmaxnc.variables[options.timevname]
+try:
+    nctime = MFTime(nctime)
+except AttributeError:
+    pass
 calendar = nctime.calendar
 if not calendar:
     print 'Unrecognized calendar. Using gregorian.'
@@ -150,9 +154,9 @@ else:
         daylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(nd[6:]))
     else:
         dayone = netcdftime.num2date(nctime[0], nctime.units,
-            calendar=calendar)
+                calendar=calendar)
         daylast = netcdftime.num2date(nctime[-1], nctime.units,
-            calendar=calendar)
+                calendar=calendar)
     dates = pd.date_range(str(dayone), str(daylast))
     shorten = 0
     if (daylast.day!=30)|(daylast.month!=12):
@@ -192,6 +196,10 @@ else:
         tmaxnc = Dataset(options.tmaxfile, 'r')
 vname = options.tmaxvname
 bptime = tmaxnc.variables[options.timevname]
+try:
+    bptime = MFTime(bptime)
+except AttributeError:
+    pass
 if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
     st = str(int(bptime[0]))
     nd = str(int(bptime[-1]))
@@ -200,7 +208,7 @@ if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
 else:
     bpdayone = netcdftime.num2date(bptime[0], bptime.units, calendar=calendar)
     bpdaylast = netcdftime.num2date(bptime[-1], bptime.units, calendar=calendar)
-if calendar=='360_day': bpdates = calendar360(dayone, daylast)
+if calendar=='360_day': bpdates = calendar360(bpdayone, bpdaylast)
 else: 
     bpdates = pd.date_range(str(bpdayone), str(bpdaylast))
     dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
@@ -268,7 +276,7 @@ except IndexError:
 try:
     tmaxnc = MFDataset(options.tmaxfile, 'r')
 except IndexError:
-    tmaxnc = Dataset(options.tminfile, 'r')
+    tmaxnc = Dataset(options.tmaxfile, 'r')
 tmax = tmaxnc.variables[options.tmaxvname][:]
 if len(tmax.shape)==4: tmax = tmax.squeeze()
 tmin = tminnc.variables[options.tminvname][:]
@@ -495,6 +503,7 @@ try:
     experiment = tmaxnc.__getattribute__('experiment')
     model = tmaxnc.__getattribute__('model_id')
     realization = tmaxnc.__getattribute__('parent_experiment_rip')
+    if realization==u'N/A': realization = u'r1i1p1'
 except AttributeError:
     experiment = ''
     model = ''
@@ -508,9 +517,9 @@ except KeyError:
     latname = 'latitude'
     space = (tmaxnc.dimensions['latitude'].__len__(),tmaxnc.dimensions['longitude'].__len__())
 
-def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):    
-    yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, model, 
-            experiment, realization, season), mode='w')
+def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
+    yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, model,experiment,
+        realization, season), 'w')
     yearlyout.createDimension('time', len(range(first_year,
             daylast.year+1)))
     yearlyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
