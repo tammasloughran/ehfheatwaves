@@ -39,21 +39,21 @@ parser.add_option('-n', '--tmin', dest='tminfile',
 parser.add_option('--vnamen', dest='tminvname', default='tasmin',
         help='tmin variable name', metavar='STR')
 parser.add_option('--bpfx', dest='bpfx',
-                help=('Indicates a future simulation, specifying a tmax file '
-                'containing the historical base period to be used'),
-                metavar='FILE')
+        help=('Indicates a future simulation, specifying a tmax file '
+        'containing the historical base period to be used'),
+        metavar='FILE')
 parser.add_option('--bpfn', dest='bpfn',
-                help=('Indicates a future simulation, specifying a tmin file '
-                'containing the historical base period to be used'),
-                metavar='FILE')
+        help=('Indicates a future simulation, specifying a tmin file '
+        'containing the historical base period to be used'),
+        metavar='FILE')
 parser.add_option('-m', '--mask', dest='maskfile',
         help='file containing land-sea mask', metavar='FILE')
 parser.add_option('--vnamem', dest='maskvname', default='sftlf',
         help='mask variable name', metavar='STR')
 parser.add_option('--vnamet', dest='timevname', default='time',
-                help='time variable name', metavar='STR')
+        help='time variable name', metavar='STR')
 parser.add_option('-s', '--season', dest='season', default='summer',
-        help='austal season for annual metrics. Defaults to austral summer',
+        help='Season for annual metrics. Defaults to summer',
         metavar='STR')
 parser.add_option('-p', dest='pcntl', type='float', default=90,
         help='the percentile to use for thresholds. Defaults to 90',
@@ -502,26 +502,33 @@ if yearlyout:
 try:
     experiment = tmaxnc.__getattribute__('experiment')
     model = tmaxnc.__getattribute__('model_id')
-    realization = tmaxnc.__getattribute__('parent_experiment_rip')
-    if realization==u'N/A': realization = u'r1i1p1'
+    parent = tmaxnc.__getattribute__('parent_experiment_rip')
+    realization = tmaxnc.__getattribute__('realization')
+    initialization = tmaxnc.__getattribute__('initialization_method')
+    physics = tmaxnc.__getattribute__('physics_version')
+    rip = 'r'+str(realization)+'i'+str(initialization)+'p'+str(physics)
 except AttributeError:
     experiment = ''
     model = ''
     realization = ''
+    rip = ''
+    initialization = ''
+    physics = ''
 try:
-    space = (tmaxnc.dimensions['lat'].__len__(),tmaxnc.dimensions['lon'].__len__())
+    space = (tmaxnc.dimensions['lat'].__len__(),
+            tmaxnc.dimensions['lon'].__len__())
     lonname = 'lon'
     latname = 'lat'
 except KeyError:
     lonname = 'longitude'
     latname = 'latitude'
-    space = (tmaxnc.dimensions['latitude'].__len__(),tmaxnc.dimensions['longitude'].__len__())
+    space = (tmaxnc.dimensions['latitude'].__len__(),
+            tmaxnc.dimensions['longitude'].__len__())
 
 def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
-    yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, model,experiment,
-        realization, season), 'w')
-    yearlyout.createDimension('time', len(range(first_year,
-            daylast.year+1)))
+    yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, 
+        model, experiment, rip, season), 'w')
+    yearlyout.createDimension('time', len(range(first_year, daylast.year+1)))
     yearlyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
     yearlyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
     yearlyout.createDimension('day', daysinyear)
@@ -533,19 +540,22 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
     if model:
         setattr(yearlyout, "model_id", model)
         setattr(yearlyout, "experiment", experiment)
-        setattr(yearlyout, "realization", "%s"%(realization))
+        setattr(yearlyout, "parent_experiment_rip", parent)
+        setattr(yearlyout, "realization", realization)
+        setattr(yearlyout, "initialization_method", initialization)
+        setattr(yearlyout, "physics_version", physics)
     setattr(yearlyout, "period", "%s-%s"%(str(first_year),str(daylast.year)))
     setattr(yearlyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
     setattr(yearlyout, "percentile", "%sth"%(str(pcntl)))
     setattr(yearlyout, "definition", definition)
     setattr(yearlyout, "frequency", "yearly")
     setattr(yearlyout, "season", season)
-    setattr(yearlyout, "definition", definition)
     setattr(yearlyout, "season_note", ("The year of a season is the year it starts"
-            "in. SH summer: Nov-Mar. NH summer: May-Sep."))
+            " in. SH summer: Nov-Mar. NH summer: May-Sep."))
     try:
         file = open('version', 'r')
-        commit = file.read()[:-2]
+        commit = file.read()[:]
+        if commit[-2:]==r'\n': commit = commit[:-2]
     except IOError:
         commit = "Unknown. Check date for latest version."
     setattr(yearlyout, "git_commit", commit)
@@ -573,8 +583,8 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
     setattr(otpct, 'units', 'degC')
     setattr(otpct, 'description', 
             '90th percentile of %s-%s'%(str(bpstart),str(bpend)))
-    HWAout = yearlyout.createVariable('HWA_%s'%(definition), 'f8', ('time','lat','lon'), 
-            fill_value=-999.99)
+    HWAout = yearlyout.createVariable('HWA_%s'%(definition), 'f8', 
+            ('time','lat','lon'), fill_value=-999.99)
     setattr(HWAout, 'long_name', 'Heatwave Amplitude')
     if definition=='tx90pct':
         setattr(HWAout, 'units', 'degC')
@@ -584,8 +594,8 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
         setattr(HWAout, 'units', 'degC2')
     setattr(HWAout, 'description', 
             'Peak of the hottest heatwave per year')
-    HWMout = yearlyout.createVariable('HWM_%s'%(definition), 'f8', ('time','lat','lon'),
-            fill_value=-999.99)
+    HWMout = yearlyout.createVariable('HWM_%s'%(definition), 'f8', 
+            ('time','lat','lon'), fill_value=-999.99)
     setattr(HWMout, 'long_name', 'Heatwave Magnitude')
     if definition=='tx90pct':
         setattr(HWAout, 'units', 'degC')
@@ -594,23 +604,23 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
     elif definition=='EHF':
         setattr(HWAout, 'units', 'degC2')
     setattr(HWMout, 'description', 'Average magnitude of the yearly heatwave')
-    HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8', ('time', 'lat', 'lon'), 
-            fill_value=-999.99)
+    HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8', 
+            ('time', 'lat', 'lon'), fill_value=-999.99)
     setattr(HWNout, 'long_name', 'Heatwave Number')
     setattr(HWNout, 'units','heatwaves')
     setattr(HWNout, 'description', 'Number of heatwaves per year')
-    HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8', ('time','lat','lon'), 
-            fill_value=-999.99)
+    HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8', 
+            ('time','lat','lon'), fill_value=-999.99)
     setattr(HWFout, 'long_name','Heatwave Frequency')
     setattr(HWFout, 'units', 'days')
     setattr(HWFout, 'description', 'Proportion of heatwave days per season')
-    HWDout = yearlyout.createVariable('HWD_%s'%(definition), 'f8', ('time','lat','lon'), 
-            fill_value=-999.99)
+    HWDout = yearlyout.createVariable('HWD_%s'%(definition), 'f8', 
+            ('time','lat','lon'), fill_value=-999.99)
     setattr(HWDout, 'long_name', 'Heatwave Duration')
     setattr(HWDout, 'units', 'days')
     setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
-    HWTout = yearlyout.createVariable('HWT_%s'%(definition), 'f8', ('time','lat','lon'), 
-            fill_value=-999.99)
+    HWTout = yearlyout.createVariable('HWT_%s'%(definition), 'f8', 
+            ('time','lat','lon'), fill_value=-999.99)
     setattr(HWTout, 'long_name', 'Heatwave Timing')
     setattr(HWTout, 'units', 'days from strat of season')
     setattr(HWTout, 'description', 'First heat wave day of the season')
@@ -659,7 +669,7 @@ if yearlyout:
 
 if dailyout:
     dailyout = Dataset('EHF_heatwaves_%s_%s_%s_daily.nc'\
-            %(model, experiment, realization), mode='w')
+            %(model, experiment, rip), mode='w')
     dailyout.createDimension('time', EHF.shape[0])
     dailyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
     dailyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
@@ -674,10 +684,14 @@ if dailyout:
     if model:
         setattr(dailyout, "model_id", model)
         setattr(dailyout, "experiment", experiment)
+        setattr(dailyout, "parent_experiment_rip", parent)
         setattr(dailyout, "realization", realization)
+        setattr(dailyout, "initialization_method", initialization)
+        setattr(dailyout, "physics_version", physics)
     try:
         file = open('version', 'r')
-        commit = file.read()[:-2]
+        commit = file.read()[:]
+        if commit[-2:]==r'\n': commit = commit[:-2]
     except IOError:
         commit = "Unknown. Check date for latest version."
     setattr(dailyout, "git_commit", commit)
@@ -700,17 +714,18 @@ if dailyout:
     setattr(olon, 'standard_name', 'longitude')
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
-    oehf = dailyout.createVariable('ehf', 'f8', ('time','lat','lon'),
-                fill_value=-999.99)
+    oehf = dailyout.createVariable('ehf', 'f8', 
+            ('time','lat','lon'), fill_value=-999.99)
     setattr(oehf, 'standard_name', 'EHF')
     setattr(oehf, 'long_name', 'Excess Heat Factor')
     setattr(oehf, 'units', 'degC2')
-    oevent = dailyout.createVariable('event', 'f8', ('time','lat','lon'),
-                fill_value=-999.99)
+    oevent = dailyout.createVariable('event', 'f8', 
+            ('time','lat','lon'), fill_value=-999.99)
     setattr(oevent, 'long_name', 'Event indicator')
-    setattr(oevent, 'description', 'Indicates whether a heatwave is happening on that day')
-    oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'),
-                        fill_value=-999.99)
+    setattr(oevent, 'description', 
+            'Indicates whether a heatwave is happening on that day')
+    oends = dailyout.createVariable('ends', 'f8', 
+            ('time','lat','lon'), fill_value=-999.99)
     setattr(oends, 'long_name', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
     otime[:] = range(0,nyears*daysinyear-shorten,1)
