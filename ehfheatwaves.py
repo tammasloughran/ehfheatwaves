@@ -453,7 +453,7 @@ def split_hemispheres(EHF):
         # Reshape to 2D
         space = EHF_n.shape[1:]
         if len(space)>1:
-            EHF_n = EHF_s.reshape(EHF_n.shape[0],space[0]*space[1])
+            EHF_n = EHF_n.reshape(EHF_n.shape[0],space[0]*space[1])
         # Northern hemisphere aspects
         HWA_n, HWM_n, HWN_n, HWF_n, HWD_n, HWT_n = \
                 hw_aspects(EHF_n, season, 'north')
