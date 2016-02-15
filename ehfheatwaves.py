@@ -212,18 +212,28 @@ if calendar=='360_day': bpdates = calendar360(bpdayone, bpdaylast)
 else: 
     bpdates = pd.date_range(str(bpdayone), str(bpdaylast))
     dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
-tmax = tmaxnc.variables[vname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
+tmax = tmaxnc.variables[options.tmaxvname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
+tmin = tminnc.variables[options.tminvname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
+if len(tmin.shape)==4: tmin = tmin.squeeze()
 if len(tmax.shape)==4: tmax = tmax.squeeze()
 original_shape = tmax.shape
+# Test for increasing latitude and flip if decreasing
+try:
+    lats = tmaxnc.variables['lat'][:]
+except KeyError:
+    lats = tmaxnc.variables['latitude'][:]
+increasing = (lats[0]-lats[-1])<0
+if not increasing:
+    lats = np.flipud(lats)
+    tmax = np.fliplr(tmax)
+    tmin = np.fliplr(tmin)
 if options.maskfile:
-    tmax = tmax[:,mask]
-if tmaxnc.variables[vname].units=='K': tmax -= 273.15
-vname = options.tminvname
-tmin = tminnc.variables[vname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
-if len(tmin.shape)==4: tmin = tmin.squeeze()
-if options.maskfile:
+    if not increasing: mask = np.flipud(mask)
     tmin = tmin[:,mask]
-if tminnc.variables[vname].units=='K': tmin -= 273.15
+    tmax = tmax[:,mask]
+if tmaxnc.variables[options.tmaxvname].units=='K': 
+    tmax -= 273.15
+    tmin -= 273.15
 tave_base = (tmax + tmin)/2.
 if not options.t90pc:
     del tmin
@@ -281,7 +291,18 @@ tmax = tmaxnc.variables[options.tmaxvname][:]
 if len(tmax.shape)==4: tmax = tmax.squeeze()
 tmin = tminnc.variables[options.tminvname][:]
 if len(tmin.shape)==4: tmin = tmin.squeeze()
+# Test for increasing latitude and flip if decreasing
+try:
+    lats = tmaxnc.variables['lat'][:]
+except KeyError:
+    lats = tmaxnc.variables['latitude'][:]
+increasing = (lats[0]-lats[-1])<0
+if not increasing:
+    lats = np.flipud(lats)
+    tmax = np.fliplr(tmax)
+    tmin = np.fliplr(tmin)
 if options.maskfile:
+#    if not increasing: mask = np.flipud(mask)
     tmax = tmax[:,mask]
     tmin = tmin[:,mask]
 if tmaxnc.variables[options.tmaxvname].units=='K': tmax -= 273.15
@@ -484,10 +505,10 @@ def split_hemispheres(EHF):
 
 if yearlyout:
     # Split by latitude
-    try:
-        lats = tmaxnc.variables['lat'][:]
-    except KeyError:
-        lats = tmaxnc.variables['latitude'][:]
+#    try:
+#        lats = tmaxnc.variables['lat'][:]
+#    except KeyError:
+#        lats = tmaxnc.variables['latitude'][:]
     north = (lats>0).any()
     south = (lats<=0).any()
     HWA_EHF, HWM_EHF, HWN_EHF, HWF_EHF, HWD_EHF, HWT_EHF = \
@@ -625,7 +646,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
     setattr(HWTout, 'units', 'days from strat of season')
     setattr(HWTout, 'description', 'First heat wave day of the season')
     otime[:] = range(first_year, daylast.year+1)
-    olat[:] = tmaxnc.variables[latname][:]
+    olat[:] = lats
     olon[:] = tmaxnc.variables[lonname][:]
     dummy_array = np.ones((daysinyear,)+original_shape[1:])*np.nan
     if options.maskfile:
@@ -729,7 +750,7 @@ if dailyout:
     setattr(oends, 'long_name', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
     otime[:] = range(0,nyears*daysinyear-shorten,1)
-    olat[:] = tmaxnc.variables[latname][:]
+    olat[:] = lats
     olon[:] = tmaxnc.variables[lonname][:]
     if options.maskfile:
         dummy_array = np.ones((EHF.shape[0],)+original_shape[1:])*np.nan
