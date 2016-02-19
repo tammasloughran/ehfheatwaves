@@ -69,7 +69,7 @@ parser.add_option('-d', '--daily', action="store_true", dest='daily',
 parser.add_option('--dailyonly', action="store_true", dest='dailyonly',
         help='output only daily values and suppress yearly output')
 parser.add_option('--t90pc', action="store_true", dest='t90pc',
-                help='Calculate tx90pc and tn90pc heatwaves')
+        help='Calculate tx90pc and tn90pc heatwaves')
 (options, args) = parser.parse_args()
 if not options.tmaxfile or not options.tminfile:
     print "Please specify tmax and tmin files."
@@ -419,10 +419,14 @@ def hw_aspects(EHF, season, hemisphere):
         ito = endday + daysinyear*iyear + allowance
         EHF_i = EHF[ifrom:ito,...]
         event_i, duration_i = identify_hw(EHF_i)
+        # Identify heatwaves that span the entire season
+        perpetual = event_i[:-allowance,...].all(axis=0)
         # Remove events that start after the end of the season and before start
         EHF_i = EHF_i[1:,...]
-        duration_i = duration_i[1:-allowance]
-        event_i = event_i[1:-allowance]
+        duration_i = duration_i[1:-allowance,...]
+        event_i = event_i[1:-allowance,...]
+        # Indicate perpetual heatwaves if they occur.
+        if perpetual.any(): duration_i[0,perpetual] = duration_i.shape[0]
         # Calculate metrics
         HWN[iyear,...] = (duration_i>0).sum(axis=0)
         HWF[iyear,...] = duration_i.sum(axis=0)
@@ -430,7 +434,7 @@ def hw_aspects(EHF, season, hemisphere):
         HWT[iyear,...] = np.argmax(event_i,axis=0)
         HWT[iyear,HWD[iyear,...]==0] = np.nan
         HWD[iyear,HWD[iyear,...]==0] = np.nan
-       # HWM and HWA must be done on each gridcell
+        # HWM and HWA must be done on each gridcell
         for x in xrange(EHF_i.shape[1]):
             hw_mag = []
             # retrieve indices where heatwaves start.
@@ -505,10 +509,6 @@ def split_hemispheres(EHF):
 
 if yearlyout:
     # Split by latitude
-#    try:
-#        lats = tmaxnc.variables['lat'][:]
-#    except KeyError:
-#        lats = tmaxnc.variables['latitude'][:]
     north = (lats>0).any()
     south = (lats<=0).any()
     HWA_EHF, HWM_EHF, HWN_EHF, HWF_EHF, HWD_EHF, HWT_EHF = \
