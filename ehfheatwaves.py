@@ -818,7 +818,7 @@ if dailyout:
         oevent[:] = dummy_array.copy()
         if options.daily: dummy_array[:,mask] = ends
         elif options.tx90pcd: dummy_array[:,mask] = ends_tx
-        elif options.tx90pcd: dummy_array[:,mask] = ends_tn
+        elif options.tn90pcd: dummy_array[:,mask] = ends_tn
         dummy_array[np.isnan(dummy_array)] = -999.99
         dummy_array[:31,...] = -999.99
         oends[:] = dummy_array.copy()
