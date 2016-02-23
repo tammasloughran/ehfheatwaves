@@ -1,5 +1,5 @@
-import warnings
-warnings.filterwarnings('ignore')
+#import warnings
+#warnings.filterwarnings('ignore')
 import sys
 try:
     modulename = 'pandas'
@@ -70,6 +70,16 @@ parser.add_option('--dailyonly', action="store_true", dest='dailyonly',
         help='output only daily values and suppress yearly output')
 parser.add_option('--t90pc', action="store_true", dest='t90pc',
         help='Calculate tx90pc and tn90pc heatwaves')
+parser.add_option('--tx90pc', action="store_true", dest='tx90pc',
+        help='Calculate tx90pc seasonal heatwaves')
+parser.add_option('--tn90pc', action="store_true", dest='tn90pc',
+        help='Calculate tn90pc seasonal heatwaves')
+parser.add_option('--tx90pc-daily', action="store_true", dest='tx90pcd',
+        help='Calculate tx90pc daily heatwaves')
+parser.add_option('--tn90pc-daily', action="store_true", dest='tn90pcd',
+        help='Calculate tn90pc daily heatwaves')
+parser.add_option('--noehf', action="store_true", dest='noehf',
+        help='Supress EHF output and only use the specified t90pc')
 (options, args) = parser.parse_args()
 if not options.tmaxfile or not options.tminfile:
     print "Please specify tmax and tmin files."
@@ -94,10 +104,22 @@ if (season!='summer')&(season!='winter'):
     sys.exit(2)
 # save daily EHF output
 yearlyout = True
-dailyout = options.daily
+dailyout = False
+if options.daily or options.tx90pcd or options.tn90pcd: dailyout = True
 if options.dailyonly: 
     dailyout = True
     yearlyout = False
+# Manage yearly output options
+if options.t90pc:
+    options.tx90pc = True
+    options.tn90pc = True
+# Flags affecting data managment
+keeptmax = False
+if options.tx90pc or options.tx90pcd: keeptmax = True
+keeptmin = False
+if options.tn90pc or options.tn90pcd: keeptmin = True
+keeptave = True
+if options.noehf: keeptave = False
 
 # Load time data
 try:
@@ -234,24 +256,25 @@ if options.maskfile:
 if tmaxnc.variables[options.tmaxvname].units=='K': 
     tmax -= 273.15
     tmin -= 273.15
-tave_base = (tmax + tmin)/2.
-if not options.t90pc:
-    del tmin
-    del tmax
+if keeptave: tave_base = (tmax + tmin)/2.
+if not keeptmin: del tmin
+if not keeptmax: del tmax
 
 # Remove leap days in gregorian calendars
 if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
             (calendar=='standard'):
-    tave_base = tave_base[(dates_base.month!=2)|(dates_base.day!=29),...]
-    if options.t90pc:
+    if keeptave:
+        tave_base = tave_base[(dates_base.month!=2)|(dates_base.day!=29),...]
+    if keeptmax:
         tmax = tmax[(dates_base.month!=2)|(dates_base.day!=29),...]
+    if keeptmin:
         tmin = tmin[(dates_base.month!=2)|(dates_base.day!=29),...]
     del dates_base
 
 # Caclulate 90th percentile
-tpct = np.ones(((daysinyear,)+tave_base.shape[1:]))*np.nan
-txpct = tpct.copy()
-tnpct = tpct.copy()
+if not options.noehf: tpct = np.ones(((daysinyear,)+tave_base.shape[1:]))*np.nan
+if keeptmax: txpct = np.ones(((daysinyear,)+tmax.shape[1:]))*np.nan
+if keeptmin: tnpct = np.ones(((daysinyear,)+tmin.shape[1:]))*np.nan
 window = np.zeros(daysinyear,dtype=np.bool)
 wsize = 15.
 window[-np.floor(wsize/2.):] = 1
@@ -270,12 +293,14 @@ elif qtilemethod=='climpact':
     percentile = qtiler.quantile_climpact
     parameter = False
 for day in xrange(daysinyear):
-    tpct[day,...] = percentile(tave_base[window,...], pcntl, parameter)
-    if options.t90pc:
+    if keeptave:
+        tpct[day,...] = percentile(tave_base[window,...], pcntl, parameter)
+    if keeptmax:
         txpct[day,...] = percentile(tmax[window,...], pcntl, parameter)
+    if keeptmin:
         tnpct[day,...] = percentile(tmin[window,...], pcntl, parameter)
     window = np.roll(window,1)
-del tave_base
+if not options.noehf: del tave_base
 del window
 
 # Load all data
@@ -307,17 +332,18 @@ if options.maskfile:
     tmin = tmin[:,mask]
 if tmaxnc.variables[options.tmaxvname].units=='K': tmax -= 273.15
 if tminnc.variables[options.tminvname].units=='K': tmin -= 273.15
-tave = (tmax + tmin)/2.
-if not options.t90pc:
-    del tmax
-    del tmin
+if keeptave: tave = (tmax + tmin)/2.
+if not keeptmin: del tmin
+if not keeptmax: del tmax
 
 # Remove leap days from tave
 if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
             (calendar=='standard'):
-    tave = tave[(dates.month!=2)|(dates.day!=29),...]
-    if options.t90pc:
+    if keeptave:
+        tave = tave[(dates.month!=2)|(dates.day!=29),...]
+    if keeptmax:
         tmax = tmax[(dates.month!=2)|(dates.day!=29),...]
+    if keeptmin:
         tmin = tmin[(dates.month!=2)|(dates.day!=29),...]
 
 # Remove incomplete starting year
@@ -325,20 +351,33 @@ first_year = dayone.year
 if (dayone.month!=1)|(dayone.day!=1):
     first_year = dayone.year+1
     start = np.argmax(dates.year==first_year)
-    tave = tave[start:,...]
-    if options.t90pc:
-        tmax = tmax[start:,...]
-        tmin = tmin[start:,...]
+    if keeptave: tave = tave[start:,...]
+    if keeptmax: tmax = tmax[start:,...]
+    if keeptmin: tmin = tmin[start:,...]
 
 # Calculate EHF
-EHF = np.ones(tave.shape)*np.nan
-for i in xrange(32,tave.shape[0]):
-    EHIaccl = tave[i-2:i+1,...].sum(axis=0)/3. - \
-            tave[i-32:i-2,...].sum(axis=0)/30.
-    EHIsig = tave[i-2:i+1,...].sum(axis=0)/3. - \
-            tpct[i-daysinyear*int((i+1)/daysinyear),...]
-    EHF[i,...] = np.maximum(EHIaccl,1.)*EHIsig
-EHF[EHF<0] = 0
+if not options.noehf:
+    EHF = np.ones(tave.shape)*np.nan
+    for i in xrange(32,tave.shape[0]):
+        EHIaccl = tave[i-2:i+1,...].sum(axis=0)/3. - \
+                tave[i-32:i-2,...].sum(axis=0)/30.
+        EHIsig = tave[i-2:i+1,...].sum(axis=0)/3. - \
+                tpct[i-daysinyear*int((i+1)/daysinyear),...]
+        EHF[i,...] = np.maximum(EHIaccl,1.)*EHIsig
+    EHF[EHF<0] = 0
+
+# Tx90pc exceedences
+if keeptmin or keeptmax:
+    if keeptmax:
+        txexceed = np.ones(tmax.shape)*np.nan
+        for i in xrange(0,tmax.shape[0]):
+            idoy = i-daysinyear*int((i+1)/daysinyear)
+            txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
+    if keeptmin:
+        tnexceed = np.ones(tmin.shape)*np.nan
+        for i in xrange(0,tmin.shape[0]):
+            idoy = i-daysinyear*int((i+1)/daysinyear)
+            tnexceed[i,...] = tmin[i,...]>tnpct[idoy,...]
 
 def identify_hw(ehfs):
     """identify_hw locates heatwaves from EHF and returns an event indicator 
@@ -346,7 +385,7 @@ def identify_hw(ehfs):
     """
     # Agregate consecutive days with EHF>0
     # First day contains duration
-    events = (ehfs>0.).astype(np.int)
+    events = (ehfs!=0.).astype(np.int)
     for i in xrange(events.shape[0]-2,-1,-1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
 
@@ -367,20 +406,14 @@ def identify_hw(ehfs):
     endss[endss<3] = 0
     return events, endss
 
-# Tx90pc exceedences
-if options.t90pc:
-    txexceed = np.ones(tmax.shape)*np.nan
-    tnexceed = txexceed.copy()
-    for i in xrange(0,tmax.shape[0]):
-        idoy = i-daysinyear*int((i+1)/daysinyear)
-        txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
-        tnexceed[i,...] = tmin[i,...]>tnpct[idoy,...]
-    txexceed[txexceed>0] = tmax[txexceed>0]
-    tnexceed[tnexceed>0] = tmin[tnexceed>0]
-
-# For daily output
-if dailyout:
-    event, ends = identify_hw(EHF)
+# Calcilate daily output
+if options.daily: event, ends = identify_hw(EHF)
+if options.tx90pcd: 
+    event_tx, ends_tx = identify_hw(txexceed)
+    txexceed[event_tx>0] = tmax[event_tx>0]
+if options.tn90pcd: 
+    event_tn, ends_tn = identify_hw(tnexceed)
+    tnexceed[event_tn>0] = tmin[event_tn>0]
 
 nyears = len(range(first_year,daylast.year+1))
 
@@ -507,19 +540,23 @@ def split_hemispheres(EHF):
         HWT = HWT_s
     return HWA, HWM, HWN, HWF, HWD, HWT
 
+# Calculate yearly output
 if yearlyout:
     # Split by latitude
     north = (lats>0).any()
     south = (lats<=0).any()
-    HWA_EHF, HWM_EHF, HWN_EHF, HWF_EHF, HWD_EHF, HWT_EHF = \
-            split_hemispheres(EHF)
-    if options.t90pc:
+    if not options.noehf:
+        HWA_EHF, HWM_EHF, HWN_EHF, HWF_EHF, HWD_EHF, HWT_EHF = \
+                split_hemispheres(EHF)
+    if options.tx90pc:
         HWA_tx, HWM_tx, HWN_tx, HWF_tx, HWD_tx, HWT_tx = \
                 split_hemispheres(txexceed)
+    if options.tn90pc:
         HWA_tn, HWM_tn, HWN_tn, HWF_tn, HWD_tn, HWT_tn = \
                 split_hemispheres(tnexceed)
 
 # Save to netCDF
+# Retrieve metadata from file
 try:
     experiment = tmaxnc.__getattribute__('experiment')
     model = tmaxnc.__getattribute__('model_id')
@@ -547,6 +584,8 @@ except KeyError:
             tmaxnc.dimensions['longitude'].__len__())
 
 def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
+    """Save yearly data to netcdf file.
+    """
     yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, 
         model, experiment, rip, season), 'w')
     yearlyout.createDimension('time', len(range(first_year, daylast.year+1)))
@@ -682,16 +721,23 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
         HWTout[:] = HWT.reshape((nyears,)+space)
     yearlyout.close()
 
+# Save yearly data to netcdf
 if yearlyout:
-    save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,"EHF")
-    if options.t90pc:
+    if not options.noehf:
+        save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,"EHF")
+    if options.tx90pc: 
         save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,"tx90pct")
+    if options.tn90pc:
         save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,"tn90pct")
 
+# Save daily data to netcdf
 if dailyout:
-    dailyout = Dataset('EHF_heatwaves_%s_%s_%s_daily.nc'\
-            %(model, experiment, rip), mode='w')
-    dailyout.createDimension('time', EHF.shape[0])
+    if options.daily: defn ='EHF'
+    elif options.tx90pcd: defn = 'tx90pct'
+    elif options.tn90pcd: defn = 'tn90pct'
+    dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'\
+            %(defn, model, experiment, rip), mode='w')
+    dailyout.createDimension('time', nyears*daysinyear-shorten)
     dailyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
     dailyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
     setattr(dailyout, "author", "Tammas Loughran")
@@ -724,9 +770,7 @@ if dailyout:
     otime = dailyout.createVariable('time', 'f8', 'time',
                     fill_value=-999.99)
     setattr(otime, 'units', 'days since %s-01-01'%(first_year))
-    if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|(calendar=='standard'):
-        calendar = '365_day'
-    setattr(otime, 'calendar', calendar)
+    setattr(otime, 'calendar', '365_day')
     olat = dailyout.createVariable('lat', 'f8', 'lat')
     setattr(olat, 'standard_name', 'latitude')
     setattr(olat, 'long_name', 'Latitude')
@@ -735,11 +779,18 @@ if dailyout:
     setattr(olon, 'standard_name', 'longitude')
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
-    oehf = dailyout.createVariable('ehf', 'f8', 
+    oehf = dailyout.createVariable(defn, 'f8', 
             ('time','lat','lon'), fill_value=-999.99)
-    setattr(oehf, 'standard_name', 'EHF')
-    setattr(oehf, 'long_name', 'Excess Heat Factor')
-    setattr(oehf, 'units', 'degC2')
+    setattr(oehf, 'standard_name', defn)
+    if defn=='EHF':
+        setattr(oehf, 'long_name', 'Excess Heat Factor')
+        setattr(oehf, 'units', 'degC2')
+    elif defn=='tx90pct':
+        setattr(oehf, 'long_name', 'Temperature Exceeding tx90pct')
+        setattr(oehf, 'units', 'C')
+    elif defn=='tn90pct':
+        setattr(oehf, 'long_name', 'Temperature Exceeding tn90pct')
+        setattr(oehf, 'units', 'C')
     oevent = dailyout.createVariable('event', 'f8', 
             ('time','lat','lon'), fill_value=-999.99)
     setattr(oevent, 'long_name', 'Event indicator')
@@ -753,20 +804,35 @@ if dailyout:
     olat[:] = lats
     olon[:] = tmaxnc.variables[lonname][:]
     if options.maskfile:
-        dummy_array = np.ones((EHF.shape[0],)+original_shape[1:])*np.nan
-        dummy_array[:,mask] = EHF
+        dummy_array = np.ones((nyears*daysinyear-shorten,)+original_shape[1:])*np.nan
+        if options.daily: dummy_array[:,mask] = EHF
+        elif options.tx90pcd: dummy_array[:,mask] = txexceed
+        elif options.tn90pcd: dummy_array[:,mask] = tnexceed
         dummy_array[np.isnan(dummy_array)] = -999.99
         oehf[:] = dummy_array.copy()
-        dummy_array[:,mask] = event
+        if options.daily: dummy_array[:,mask] = event
+        elif options.tx90pcd: dummy_array[:,mask] = event_tx
+        elif options.tn90pcd: dummy_array[:,mask] = event_tn
         dummy_array[np.isnan(dummy_array)] = -999.99
         dummy_array[:31,...] = -999.99
         oevent[:] = dummy_array.copy()
-        dummy_array[:,mask] = ends
+        if options.daily: dummy_array[:,mask] = ends
+        elif options.tx90pcd: dummy_array[:,mask] = ends_tx
+        elif options.tx90pcd: dummy_array[:,mask] = ends_tn
         dummy_array[np.isnan(dummy_array)] = -999.99
         dummy_array[:31,...] = -999.99
         oends[:] = dummy_array.copy()
     else:
-        oehf[:] = EHF
-        oevent[:] = event
-        oends[:] = ends
+        if options.daily:
+            oehf[:] = EHF
+            oevent[:] = event
+            oends[:] = ends
+        elif options.tx90pcd:
+            oehf[:] = txexceed
+            oevent[:] = events_tx
+            oends[:] = ends_tx
+        elif options.tx90pcd:
+            oehf[:] = tnexceed
+            oevent[:] = events_tn
+            oends[:] = ends_tn
     dailyout.close()
