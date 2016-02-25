@@ -67,7 +67,7 @@ parser.add_option('-q', '--qmethod', dest='qtilemethod', default='climpact',
 parser.add_option('-d', '--daily', action="store_true", dest='daily', 
         help='output daily EHF values and heatwave indicators')
 parser.add_option('--dailyonly', action="store_true", dest='dailyonly',
-        help='output only daily values and suppress yearly output')
+        help='output only daily EHF values and suppress yearly output')
 parser.add_option('--t90pc', action="store_true", dest='t90pc',
         help='Calculate tx90pc and tn90pc heatwaves')
 parser.add_option('--tx90pc', action="store_true", dest='tx90pc',
@@ -447,19 +447,20 @@ def hw_aspects(EHF, season, hemisphere):
     for iyear, year in enumerate(xrange(first_year,daylast.year)):
         if (year==daylast.year): continue # Incomplete yr
         # Select this years season
-        allowance = 60 # For including heawave days after the end of the season
+        allowance = 14 # For including heawave days after the end of the season
         ifrom = startday + daysinyear*iyear - 1
         ito = endday + daysinyear*iyear + allowance
         EHF_i = EHF[ifrom:ito,...]
         event_i, duration_i = identify_hw(EHF_i)
         # Identify heatwaves that span the entire season
-        perpetual = event_i[:-allowance,...].all(axis=0)
+        perpetual = event_i.all(axis=0)
+        all_days = duration_i.shape[0]
         # Remove events that start after the end of the season and before start
         EHF_i = EHF_i[1:,...]
         duration_i = duration_i[1:-allowance,...]
         event_i = event_i[1:-allowance,...]
         # Indicate perpetual heatwaves if they occur.
-        if perpetual.any(): duration_i[0,perpetual] = duration_i.shape[0]
+        if perpetual.any(): duration_i[0,perpetual] = all_days
         # Calculate metrics
         HWN[iyear,...] = (duration_i>0).sum(axis=0)
         HWF[iyear,...] = duration_i.sum(axis=0)
