@@ -80,6 +80,8 @@ parser.add_option('--tn90pc-daily', action="store_true", dest='tn90pcd',
         help='Calculate tn90pc daily heatwaves')
 parser.add_option('--noehf', action="store_true", dest='noehf',
         help='Supress EHF output and only use the specified t90pc')
+parser.add_option('-v', action="store_true", dest='verbose',
+                help='Verbose')
 (options, args) = parser.parse_args()
 if not options.tmaxfile or not options.tminfile:
     print "Please specify tmax and tmin files."
@@ -121,6 +123,7 @@ if options.tn90pc or options.tn90pcd: keeptmin = True
 keeptave = True
 if options.noehf: keeptave = False
 
+if options.verbose: print "Loading data"
 # Load time data
 try:
     tmaxnc = MFDataset(options.tmaxfile, 'r')
@@ -271,6 +274,7 @@ if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
         tmin = tmin[(dates_base.month!=2)|(dates_base.day!=29),...]
     del dates_base
 
+if options.verbose: print "Calculating percentiles"
 # Caclulate 90th percentile
 if not options.noehf: tpct = np.ones(((daysinyear,)+tave_base.shape[1:]))*np.nan
 if keeptmax: txpct = np.ones(((daysinyear,)+tmax.shape[1:]))*np.nan
@@ -303,6 +307,7 @@ for day in xrange(daysinyear):
 if not options.noehf: del tave_base
 del window
 
+if options.verbose: print "Loading data"
 # Load all data
 try:
     tminnc = MFDataset(options.tminfile, 'r')
@@ -355,6 +360,7 @@ if (dayone.month!=1)|(dayone.day!=1):
     if keeptmax: tmax = tmax[start:,...]
     if keeptmin: tmin = tmin[start:,...]
 
+if options.verbose: print "Caclulating definition"
 # Calculate EHF
 if not options.noehf:
     EHF = np.ones(tave.shape)*np.nan
@@ -373,11 +379,13 @@ if keeptmin or keeptmax:
         for i in xrange(0,tmax.shape[0]):
             idoy = i-daysinyear*int((i+1)/daysinyear)
             txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
+        txexceed[txexceed>0] = tmax[txexceed>0]
     if keeptmin:
         tnexceed = np.ones(tmin.shape)*np.nan
         for i in xrange(0,tmin.shape[0]):
             idoy = i-daysinyear*int((i+1)/daysinyear)
             tnexceed[i,...] = tmin[i,...]>tnpct[idoy,...]
+        tnexceed[tnexceed>0] = tmin[tnexceed>0]
 
 def identify_hw(ehfs):
     """identify_hw locates heatwaves from EHF and returns an event indicator 
@@ -410,10 +418,8 @@ def identify_hw(ehfs):
 if options.daily: event, ends = identify_hw(EHF)
 if options.tx90pcd: 
     event_tx, ends_tx = identify_hw(txexceed)
-    txexceed[event_tx>0] = tmax[event_tx>0]
 if options.tn90pcd: 
     event_tn, ends_tn = identify_hw(tnexceed)
-    tnexceed[event_tn>0] = tmin[event_tn>0]
 
 nyears = len(range(first_year,daylast.year+1))
 
@@ -543,6 +549,7 @@ def split_hemispheres(EHF):
 
 # Calculate yearly output
 if yearlyout:
+    if options.verbose: print "Calculating yearly aspects"
     # Split by latitude
     north = (lats>0).any()
     south = (lats<=0).any()
@@ -556,6 +563,7 @@ if yearlyout:
         HWA_tn, HWM_tn, HWN_tn, HWF_tn, HWD_tn, HWT_tn = \
                 split_hemispheres(tnexceed)
 
+if options.verbose: print "Saving"
 # Save to netCDF
 # Retrieve metadata from file
 try:
@@ -584,7 +592,7 @@ except KeyError:
     space = (tmaxnc.dimensions['latitude'].__len__(),
             tmaxnc.dimensions['longitude'].__len__())
 
-def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
+def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
     """Save yearly data to netcdf file.
     """
     yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, 
@@ -725,11 +733,11 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,definition):
 # Save yearly data to netcdf
 if yearlyout:
     if not options.noehf:
-        save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,"EHF")
+        save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,tpct,"EHF")
     if options.tx90pc: 
-        save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,"tx90pct")
+        save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,txpct,"tx90pct")
     if options.tn90pc:
-        save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,"tn90pct")
+        save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,tnpct,"tn90pct")
 
 # Save daily data to netcdf
 if dailyout:
@@ -832,7 +840,7 @@ if dailyout:
             oehf[:] = txexceed
             oevent[:] = events_tx
             oends[:] = ends_tx
-        elif options.tx90pcd:
+        elif options.tn90pcd:
             oehf[:] = tnexceed
             oevent[:] = events_tn
             oends[:] = ends_tn
