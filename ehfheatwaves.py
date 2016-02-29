@@ -414,6 +414,28 @@ def identify_hw(ehfs):
     endss[endss<3] = 0
     return events, endss
 
+def identify_semi_hw(ehfs):
+    """identify_hw locates heatwaves from EHF and returns an event indicator 
+    and a duration indicator.
+    """
+    # Agregate consecutive days with EHF>0
+    # First day contains duration
+    events = (ehfs!=0.).astype(np.int)
+    for i in xrange(events.shape[0]-2,-1,-1):
+         events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
+
+    # Identify when heatwaves start with duration
+    # Given that first day contains duration
+    diff = np.zeros(events.shape)
+    diff[1:,...] = np.diff(events, axis=0)
+    endss = np.zeros(ehfs.shape,dtype=np.int)
+    endss[diff>0] = events[diff>0]
+
+    del diff
+    events[events>0] = 1
+    events = events.astype(np.bool)
+    return events, endss
+
 # Calcilate daily output
 if options.daily: event, ends = identify_hw(EHF)
 if options.tx90pcd: 
@@ -458,19 +480,21 @@ def hw_aspects(EHF, season, hemisphere):
         ito = endday + daysinyear*iyear + allowance
         EHF_i = EHF[ifrom:ito,...]
         event_i, duration_i = identify_hw(EHF_i)
+        # Remove EHF values in pre season
+        EHF_i = EHF_i[2:,...]
+        # Identify semi heatwaves that overlap the start of season only including days within the season.
+        event_i = event_i[2:,...]
+        event_i, duration_i = identify_semi_hw(event_i)
         # Identify heatwaves that span the entire season
         perpetual = event_i.all(axis=0)
         all_days = duration_i.shape[0]
-        # Remove events that start after the end of the season
-        # Include all heatwave events in season longer than 3 days regardless of when it starts.
-        EHF_i = EHF_i[:,...]
-        duration_i = duration_i[:-allowance,...]
-        #event_i = event_i[:-allowance,...]
-        # Indicate perpetual heatwaves if they occur.
+        # Indicate locations of perpetual heatwaves if they occur.
         if perpetual.any(): duration_i[0,perpetual] = all_days
+        # Remove events that start after the end of the season
+        duration_i = duration_i[:-allowance,...]
         # Calculate metrics
         HWN[iyear,...] = (duration_i>0).sum(axis=0)
-        HWF[iyear,...] = event_i.sum(axis=0)
+        HWF[iyear,...] = duration_i.sum(axis=0)
         HWD[iyear,...] = duration_i.max(axis=0)
         HWT[iyear,...] = np.argmax(event_i,axis=0)
         HWT[iyear,HWD[iyear,...]==0] = np.nan
