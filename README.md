@@ -45,8 +45,8 @@ are removed using the mask. When saving, this data need to be placed back
 into a very large gridded array. This takes up a lot of ram ~30-40GB, so 
 make sure that you have enough ram.
 
-TX90pct and TN90pct heatwaves are also available. Only the seasonal aspects are 
-available for now, no daily values. These will be output to separate files.
+TX90pct and TN90pct heatwaves are also available. Daily values are available but only output one at a time. 
+These will be output to separate files.
 
 Global datasets are treated differently depending on which hemisphere the 
 data are in. The data are split by hemispheres, and summer heatwaves are
