@@ -454,17 +454,18 @@ def hw_aspects(EHF, season, hemisphere):
         if (year==daylast.year): continue # Incomplete yr
         # Select this years season
         allowance = 14 # For including heawave days after the end of the season
-        ifrom = startday + daysinyear*iyear - 1
+        ifrom = startday + daysinyear*iyear
         ito = endday + daysinyear*iyear + allowance
         EHF_i = EHF[ifrom:ito,...]
         event_i, duration_i = identify_hw(EHF_i)
         # Identify heatwaves that span the entire season
         perpetual = event_i.all(axis=0)
         all_days = duration_i.shape[0]
-        # Remove events that start after the end of the season and before start
-        EHF_i = EHF_i[1:,...]
-        duration_i = duration_i[1:-allowance,...]
-        event_i = event_i[1:-allowance,...]
+        # Remove events that start after the end of the season
+        # Include all heatwave events in season longer than 3 days regardless of when it starts.
+        EHF_i = EHF_i[:,...]
+        duration_i = duration_i[:-allowance,...]
+        event_i = event_i[:-allowance,...]
         # Indicate perpetual heatwaves if they occur.
         if perpetual.any(): duration_i[0,perpetual] = all_days
         # Calculate metrics
