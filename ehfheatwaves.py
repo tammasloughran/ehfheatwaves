@@ -400,6 +400,9 @@ def identify_hw(ehfs):
     # Identify when heatwaves start with duration
     # Given that first day contains duration
     diff = np.zeros(events.shape)
+    # Insert the first diff value as np.diff doesn't catch it because
+    # there is no pevious value to compare to.
+    diff[0,...] = events[0,...]
     diff[1:,...] = np.diff(events, axis=0)
     endss = np.zeros(ehfs.shape,dtype=np.int)
     endss[diff>2] = events[diff>2]
@@ -422,7 +425,6 @@ if options.tn90pcd:
     event_tn, ends_tn = identify_hw(tnexceed)
 
 nyears = len(range(first_year,daylast.year+1))
-
 def hw_aspects(EHF, season, hemisphere):
     """hw_aspects takes EHF values or temp 90pct exceedences identifies
     heatwaves and calculates seasonal aspects.
@@ -454,19 +456,19 @@ def hw_aspects(EHF, season, hemisphere):
         if (year==daylast.year): continue # Incomplete yr
         # Select this years season
         allowance = 14 # For including heawave days after the end of the season
-        ifrom = startday + daysinyear*iyear - 1
+        ifrom = startday + daysinyear*iyear - 1 # -1 to include Oct 31st
         ito = endday + daysinyear*iyear + allowance
         EHF_i = EHF[ifrom:ito,...]
         event_i, duration_i = identify_hw(EHF_i)
         # Identify heatwaves that span the entire season
-        perpetual = event_i.all(axis=0)
-        all_days = duration_i.shape[0]
+        perpetual = event_i[:-allowance,...].all(axis=0)
+        perphw = duration_i[0,perpetual] - 1 # -1 to exclude Oct 31st
         # Remove events that start after the end of the season and before start
         EHF_i = EHF_i[1:,...]
         duration_i = duration_i[1:-allowance,...]
         event_i = event_i[1:-allowance,...]
         # Indicate perpetual heatwaves if they occur.
-        if perpetual.any(): duration_i[0,perpetual] = all_days
+        if perpetual.any(): duration_i[0,perpetual] = perphw
         # Calculate metrics
         HWN[iyear,...] = (duration_i>0).sum(axis=0)
         HWF[iyear,...] = duration_i.sum(axis=0)
