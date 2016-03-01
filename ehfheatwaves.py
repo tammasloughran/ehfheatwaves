@@ -427,6 +427,9 @@ def identify_semi_hw(ehfs):
     # Identify when heatwaves start with duration
     # Given that first day contains duration
     diff = np.zeros(events.shape)
+    # Insert the first diff value as np.diff doesn't catch it because
+    # there is no pevious value to compare to.
+    diff[0,...] = events[0,...]
     diff[1:,...] = np.diff(events, axis=0)
     endss = np.zeros(ehfs.shape,dtype=np.int)
     endss[diff>0] = events[diff>0]
@@ -486,10 +489,10 @@ def hw_aspects(EHF, season, hemisphere):
         event_i = event_i[2:,...]
         event_i, duration_i = identify_semi_hw(event_i)
         # Identify heatwaves that span the entire season
-        perpetual = event_i.all(axis=0)
-        all_days = duration_i.shape[0]
+        perpetual = event_i[:-allowance,...].all(axis=0)
+        perphw = duration_i[0,perpetual] - 1 # -1 to exclude Oct 31st
         # Indicate locations of perpetual heatwaves if they occur.
-        if perpetual.any(): duration_i[0,perpetual] = all_days
+        if perpetual.any(): duration_i[0,perpetual] = perphw
         # Remove events that start after the end of the season
         duration_i = duration_i[:-allowance,...]
         # Calculate metrics
