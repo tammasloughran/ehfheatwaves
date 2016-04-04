@@ -132,7 +132,9 @@ except IndexError:
 nctime = tmaxnc.variables[options.timevname]
 try:
     nctime = MFTime(nctime)
-except AttributeError:
+except AttributeError: 
+    pass
+except ValueError: 
     pass
 calendar = nctime.calendar
 if not calendar:
@@ -224,6 +226,8 @@ bptime = tmaxnc.variables[options.timevname]
 try:
     bptime = MFTime(bptime)
 except AttributeError:
+    pass
+except ValueError:
     pass
 if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
     st = str(int(bptime[0]))
