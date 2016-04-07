@@ -245,7 +245,6 @@ tmax = tmaxnc.variables[options.tmaxvname][(bpstart<=bpdates.year)&(bpdates.year
 tmin = tminnc.variables[options.tminvname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 if len(tmin.shape)==4: tmin = tmin.squeeze()
 if len(tmax.shape)==4: tmax = tmax.squeeze()
-original_shape = tmax.shape
 # Test for increasing latitude and flip if decreasing
 try:
     lats = tmaxnc.variables['lat'][:]
@@ -322,6 +321,7 @@ try:
 except IndexError:
     tmaxnc = Dataset(options.tmaxfile, 'r')
 tmax = tmaxnc.variables[options.tmaxvname][:]
+original_shape = tmax.shape
 if len(tmax.shape)==4: tmax = tmax.squeeze()
 tmin = tminnc.variables[options.tminvname][:]
 if len(tmin.shape)==4: tmin = tmin.squeeze()
@@ -360,9 +360,15 @@ first_year = dayone.year
 if (dayone.month!=1)|(dayone.day!=1):
     first_year = dayone.year+1
     start = np.argmax(dates.year==first_year)
-    if keeptave: tave = tave[start:,...]
-    if keeptmax: tmax = tmax[start:,...]
-    if keeptmin: tmin = tmin[start:,...]
+    if keeptave:
+        tave = tave[start:,...]
+        original_shape = (tave.shape[0], original_shape[1], original_shape[2])
+    if keeptmax:
+        tmax = tmax[start:,...]
+        original_shape = (tmax.shape[0], original_shape[1], original_shape[2])
+    if keeptmin:
+        tmin = tmin[start:,...]
+        original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
 
 if options.verbose: print "Caclulating definition"
 # Calculate EHF
@@ -747,12 +753,12 @@ if yearlyout:
 
 # Save daily data to netcdf
 if dailyout:
-    if options.daily: defn ='EHF'
+    if options.daily or options.dailyonly: defn ='EHF'
     elif options.tx90pcd: defn = 'tx90pct'
     elif options.tn90pcd: defn = 'tn90pct'
     dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'\
             %(defn, model, experiment, rip), mode='w')
-    dailyout.createDimension('time', nyears*daysinyear-shorten)
+    dailyout.createDimension('time', original_shape[0])
     dailyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
     dailyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
     setattr(dailyout, "author", "Tammas Loughran")
@@ -815,11 +821,11 @@ if dailyout:
             ('time','lat','lon'), fill_value=-999.99)
     setattr(oends, 'long_name', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
-    otime[:] = range(0,nyears*daysinyear-shorten,1)
+    otime[:] = range(0,original_shape[0],1)
     olat[:] = lats
     olon[:] = tmaxnc.variables[lonname][:]
     if options.maskfile:
-        dummy_array = np.ones((nyears*daysinyear-shorten,)+original_shape[1:])*np.nan
+        dummy_array = np.ones(original_shape)*np.nan
         if options.daily: dummy_array[:,mask] = EHF
         elif options.tx90pcd: dummy_array[:,mask] = txexceed
         elif options.tn90pcd: dummy_array[:,mask] = tnexceed
