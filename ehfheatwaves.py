@@ -321,8 +321,8 @@ try:
 except IndexError:
     tmaxnc = Dataset(options.tmaxfile, 'r')
 tmax = tmaxnc.variables[options.tmaxvname][:]
-original_shape = tmax.shape
 if len(tmax.shape)==4: tmax = tmax.squeeze()
+original_shape = tmax.shape
 tmin = tminnc.variables[options.tminvname][:]
 if len(tmin.shape)==4: tmin = tmin.squeeze()
 # Test for increasing latitude and flip if decreasing
