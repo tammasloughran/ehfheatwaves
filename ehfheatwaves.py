@@ -141,8 +141,8 @@ if not calendar:
 elif calendar=='360_day':
     daysinyear = 360
     # 360 day season start and end indices
-    SHS = (301,451)
-    SHW = (121,271)
+    SHS = (300,450)
+    SHW = (120,270)
     dayone = netcdftime.num2date(nctime[0], nctime.units,
             calendar=calendar)
     daylast = netcdftime.num2date(nctime[-1], nctime.units,
@@ -171,7 +171,7 @@ else:
     daysinyear = 365
     # 365 day season start and end indices
     SHS = (304,455)
-    SHW = (121,274)
+    SHW = (120,273)
     if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
         st = str(int(nctime[0]))
         nd = str(int(nctime[-1]))
@@ -409,6 +409,7 @@ def identify_hw(ehfs):
     # Identify when heatwaves start with duration
     # Given that first day contains duration
     diff = np.zeros(events.shape)
+    diff[0,...] = events[0,...]
     diff[1:,...] = np.diff(events, axis=0)
     endss = np.zeros(ehfs.shape,dtype=np.int)
     endss[diff>2] = events[diff>2]
@@ -488,7 +489,7 @@ def hw_aspects(EHF, season, hemisphere):
         if (year==daylast.year): continue # Incomplete yr
         # Select this years season
         allowance = 14 # For including heawave days after the end of the season
-        ifrom = startday + daysinyear*iyear + 2
+        ifrom = startday + daysinyear*iyear - 2
         ito = endday + daysinyear*iyear + allowance
         EHF_i = EHF[ifrom:ito,...]
         event_i, duration_i = identify_hw(EHF_i)
@@ -875,10 +876,10 @@ if dailyout:
             oends[:] = ends
         elif options.tx90pcd:
             oehf[:] = txexceed
-            oevent[:] = events_tx
+            oevent[:] = event_tx
             oends[:] = ends_tx
         elif options.tn90pcd:
             oehf[:] = tnexceed
-            oevent[:] = events_tn
+            oevent[:] = event_tn
             oends[:] = ends_tn
     dailyout.close()
