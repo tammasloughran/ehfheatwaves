@@ -710,13 +710,15 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
     setattr(HWTout, 'description', 'First heat wave day of the season')
     otime[:] = range(first_year, daylast.year+1)
     olat[:] = lats
-    olon[:] = tmaxnc.variables[lonname][:]
-    dummy_array = np.ones((daysinyear,)+original_shape[1:])*np.nan
+    lons = tmaxnc.variables[lonname][:]
+    olon[:] = lons
+    dummy_array = np.ones((daysinyear,)+(len(lats),)+(len(lons),))*np.nan
     if options.maskfile:
+        #pdb.set_trace()
         dummy_array[:,mask] = tpct
         dummy_array[np.isnan(dummy_array)] = -999.99
         otpct[:] = dummy_array.copy()
-        dummy_array = np.ones((nyears,)+original_shape[1:])*np.nan
+        dummy_array = np.ones((nyears,)+(len(lats),)+(len(lons),))*np.nan
         dummy_array[:,mask] = HWA
         dummy_array[np.isnan(dummy_array)] = -999.99
         HWAout[:] = dummy_array.copy()
