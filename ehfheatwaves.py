@@ -272,6 +272,7 @@ if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
     if keeptmin:
         tmin = tmin[(dates_base.month!=2)|(dates_base.day!=29),...]
     del dates_base
+    calendar = '365_day'
 
 if options.verbose: print "Calculating percentiles"
 # Caclulate 90th percentile
@@ -817,7 +818,7 @@ if dailyout:
     otime = dailyout.createVariable('time', 'f8', 'time',
                     fill_value=-999.99)
     setattr(otime, 'units', 'days since %s-01-01'%(first_year))
-    setattr(otime, 'calendar', '365_day')
+    setattr(otime, 'calendar', calendar)
     olat = dailyout.createVariable('lat', 'f8', 'lat')
     setattr(olat, 'standard_name', 'latitude')
     setattr(olat, 'long_name', 'Latitude')
