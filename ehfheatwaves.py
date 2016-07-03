@@ -26,6 +26,7 @@ except ImportError:
 if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
     print "Please install numpy version 1.8.0 or higher."
     sys.exit(2)
+import pdb
 
 # Parse command line arguments
 usage = "usage: %prog -x <FILE> -n <FILE> -m <FILE> [options]"
@@ -81,7 +82,9 @@ parser.add_option('--tn90pc-daily', action="store_true", dest='tn90pcd',
 parser.add_option('--noehf', action="store_true", dest='noehf',
         help='Supress EHF output and only use the specified t90pc')
 parser.add_option('-v', action="store_true", dest='verbose',
-                help='Verbose')
+        help='Verbose')
+parser.add_option('--old-method', action="store_true", dest='oldmethod',
+        help='Use the old definition of within-season heatwaves')
 (options, args) = parser.parse_args()
 if not options.tmaxfile or not options.tminfile:
     print "Please specify tmax and tmin files."
@@ -132,7 +135,9 @@ except IndexError:
 nctime = tmaxnc.variables[options.timevname]
 try:
     nctime = MFTime(nctime)
-except AttributeError:
+except AttributeError: 
+    pass
+except ValueError: 
     pass
 calendar = nctime.calendar
 if not calendar:
@@ -225,6 +230,8 @@ try:
     bptime = MFTime(bptime)
 except AttributeError:
     pass
+except ValueError:
+    pass
 if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
     st = str(int(bptime[0]))
     nd = str(int(bptime[-1]))
@@ -272,7 +279,6 @@ if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
     if keeptmin:
         tmin = tmin[(dates_base.month!=2)|(dates_base.day!=29),...]
     del dates_base
-    calendar = '365_day'
 
 if options.verbose: print "Calculating percentiles"
 # Caclulate 90th percentile
@@ -354,19 +360,20 @@ if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
     if keeptmin:
         tmin = tmin[(dates.month!=2)|(dates.day!=29),...]
         original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
+    calendar = '365_day'
 
 # Remove incomplete starting year
 first_year = dayone.year
 if (dayone.month!=1)|(dayone.day!=1):
     first_year = dayone.year+1
     start = np.argmax(dates.year==first_year)
-    if keeptave: 
+    if keeptave:
         tave = tave[start:,...]
         original_shape = (tave.shape[0], original_shape[1], original_shape[2])
-    if keeptmax: 
+    if keeptmax:
         tmax = tmax[start:,...]
         original_shape = (tmax.shape[0], original_shape[1], original_shape[2])
-    if keeptmin: 
+    if keeptmin:
         tmin = tmin[start:,...]
         original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
 
@@ -410,6 +417,8 @@ def identify_hw(ehfs):
     # Identify when heatwaves start with duration
     # Given that first day contains duration
     diff = np.zeros(events.shape)
+    # Insert the first diff value as np.diff doesn't catch it because
+    # there is no pevious value to compare to.
     diff[0,...] = events[0,...]
     diff[1:,...] = np.diff(events, axis=0)
     endss = np.zeros(ehfs.shape,dtype=np.int)
@@ -458,7 +467,6 @@ if options.tn90pcd:
     event_tn, ends_tn = identify_hw(tnexceed)
 
 nyears = len(range(first_year,daylast.year+1))
-
 def hw_aspects(EHF, season, hemisphere):
     """hw_aspects takes EHF values or temp 90pct exceedences identifies
     heatwaves and calculates seasonal aspects.
@@ -487,25 +495,42 @@ def hw_aspects(EHF, season, hemisphere):
     HWT = HWA.copy()
     # Loop over years
     for iyear, year in enumerate(xrange(first_year,daylast.year)):
-        if (year==daylast.year): continue # Incomplete yr
-        # Select this years season
-        allowance = 14 # For including heawave days after the end of the season
-        ifrom = startday + daysinyear*iyear - 2
-        ito = endday + daysinyear*iyear + allowance
-        EHF_i = EHF[ifrom:ito,...]
-        event_i, duration_i = identify_hw(EHF_i)
-        # Remove EHF values in pre season
-        EHF_i = EHF_i[2:,...]
-        # Identify semi heatwaves that overlap the start of season only including days within the season.
-        event_i = event_i[2:,...]
-        event_i, duration_i = identify_semi_hw(event_i)
-        # Identify heatwaves that span the entire season
-        perpetual = event_i[:-allowance,...].all(axis=0)
-        perphw = duration_i[0,perpetual] - 1 # -1 to exclude Oct 31st
-        # Indicate locations of perpetual heatwaves if they occur.
-        if perpetual.any(): duration_i[0,perpetual] = perphw
-        # Remove events that start after the end of the season
-        duration_i = duration_i[:-allowance,...]
+        if options.oldmethod:
+            if (year==daylast.year): continue # Incomplete yr
+            # Select this years season
+            allowance = 14 # For including heawave days after the end of the season
+            ifrom = startday + daysinyear*iyear - 1 # -1 to include Oct 31st
+            ito = endday + daysinyear*iyear + allowance
+            EHF_i = EHF[ifrom:ito,...]
+            event_i, duration_i = identify_hw(EHF_i)
+            # Identify heatwaves that span the entire season
+            perpetual = event_i[:-allowance,...].all(axis=0)
+            perphw = duration_i[0,perpetual] - 1 # -1 to exclude Oct 31st
+            # Remove events that start after the end of the season and before start
+            EHF_i = EHF_i[1:,...]
+            duration_i = duration_i[1:-allowance,...]
+            event_i = event_i[1:-allowance,...]
+            # Indicate perpetual heatwaves if they occur.
+            if perpetual.any(): duration_i[0,perpetual] = perphw
+        else:
+            # Select this years season
+            allowance = 14 # For including heawave days after the end of the season
+            ifrom = startday + daysinyear*iyear - 2
+            ito = endday + daysinyear*iyear + allowance
+            EHF_i = EHF[ifrom:ito,...]
+            event_i, duration_i = identify_hw(EHF_i)
+            # Remove EHF values in pre season
+            EHF_i = EHF_i[2:,...]
+            # Identify semi heatwaves that overlap the start of season only including days within the season.
+            event_i = event_i[2:,...]
+            event_i, duration_i = identify_semi_hw(event_i)
+            # Identify heatwaves that span the entire season
+            perpetual = event_i[:-allowance,...].all(axis=0)
+            perphw = duration_i[0,perpetual] - 1 # -1 to exclude Oct 31st
+            # Indicate locations of perpetual heatwaves if they occur.
+            if perpetual.any(): duration_i[0,perpetual] = perphw
+            # Remove events that start after the end of the season
+            duration_i = duration_i[:-allowance,...]
         # Calculate metrics
         HWN[iyear,...] = (duration_i>0).sum(axis=0)
         HWF[iyear,...] = duration_i.sum(axis=0)
@@ -734,13 +759,14 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
     setattr(HWTout, 'description', 'First heat wave day of the season')
     otime[:] = range(first_year, daylast.year+1)
     olat[:] = lats
-    olon[:] = tmaxnc.variables[lonname][:]
-    dummy_array = np.ones((daysinyear,)+original_shape[1:])*np.nan
+    lons = tmaxnc.variables[lonname][:]
+    olon[:] = lons
+    dummy_array = np.ones((daysinyear,)+(len(lats),)+(len(lons),))*np.nan
     if options.maskfile:
         dummy_array[:,mask] = tpct
         dummy_array[np.isnan(dummy_array)] = -999.99
         otpct[:] = dummy_array.copy()
-        dummy_array = np.ones((nyears,)+original_shape[1:])*np.nan
+        dummy_array = np.ones((nyears,)+(len(lats),)+(len(lons),))*np.nan
         dummy_array[:,mask] = HWA
         dummy_array[np.isnan(dummy_array)] = -999.99
         HWAout[:] = dummy_array.copy()
@@ -780,7 +806,7 @@ if yearlyout:
 
 # Save daily data to netcdf
 if dailyout:
-    if options.daily: defn ='EHF'
+    if options.daily or options.dailyonly: defn ='EHF'
     elif options.tx90pcd: defn = 'tx90pct'
     elif options.tn90pcd: defn = 'tn90pct'
     dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'\

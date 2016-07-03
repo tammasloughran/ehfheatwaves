@@ -6,25 +6,38 @@ heatwave indicators for any season rather than just annual or seasonal
 heatwave aspects. The script has been improved to handle CMIP5 quirks
 such different calendars.
 
-Usage:  
-python ehfheatwaves.py -x <FILE> -n <FILE> -m <FILE> [options]
+Usage: ehfheatwaves.py -x <FILE> -n <FILE> -m <FILE> [options]
 
-Options:  
-  -h, --help | show this help message and exit  
-  -x FILE, --tmax=FILE | file containing tmax  
-  --vnamex=STR | tmax variable name  
-  -n FILE, --tmin=FILE | file containing tmin  
-  --vnamen=STR | tmin variable name  
-  -m FILE, --mask=FILE | file containing land-sea mask  
-  --vnamem=STR | mask variable name  
-  --vnamet=STR | time variable name  
-  -s STR, --season=STR | Season for annual metrics. Defaults to summer.   
-  -p INT | the percentile to use for thresholds. Defaults to 90  
-  --base=YYYY-YYYY | base period to calculate thresholds. Default 1961-1990  
-  -q STR, --qmethod=STR | quantile interpolation method. Default is climpact  
-  -d, --daily | output daily EHF values and heatwave indicators  
-  --dailyonly | output only daily values and suppress yearly output  
-  --t90pc | Calculate tx90pc and tn90pc heatwaves  
+Options:
+  -h, --help            show this help message and exit
+  -x FILE, --tmax=FILE  file containing tmax
+  --vnamex=STR          tmax variable name
+  -n FILE, --tmin=FILE  file containing tmin
+  --vnamen=STR          tmin variable name
+  --bpfx=FILE           Indicates a future simulation, specifying a tmax file
+                        containing the historical base period to be used
+  --bpfn=FILE           Indicates a future simulation, specifying a tmin file
+                        containing the historical base period to be used
+  -m FILE, --mask=FILE  file containing land-sea mask
+  --vnamem=STR          mask variable name
+  --vnamet=STR          time variable name
+  -s STR, --season=STR  Season for annual metrics. Defaults to summer
+  -p INT                the percentile to use for thresholds. Defaults to 90
+  --base=YYYY-YYYY      base period to calculate thresholds. Default 1961-1990
+  -q STR, --qmethod=STR
+                        quantile interpolation method. Default is climpact
+  -d, --daily           output daily EHF values and heatwave indicators
+  --dailyonly           output only daily EHF values and suppress yearly
+                        output
+  --t90pc               Calculate tx90pc and tn90pc heatwaves
+  --tx90pc              Calculate tx90pc seasonal heatwaves
+  --tn90pc              Calculate tn90pc seasonal heatwaves
+  --tx90pc-daily        Calculate tx90pc daily heatwaves
+  --tn90pc-daily        Calculate tn90pc daily heatwaves
+  --noehf               Supress EHF output and only use the specified t90pc
+  -v                    Verbose
+  --old-method          Use the old definition of within-season heatwaves
+
 
 Required packages (prefereably the latest versions)  
  * numpy
@@ -45,8 +58,8 @@ are removed using the mask. When saving, this data need to be placed back
 into a very large gridded array. This takes up a lot of ram ~30-40GB, so 
 make sure that you have enough ram.
 
-TX90pct and TN90pct heatwaves are also available. Only the seasonal aspects are 
-available for now, no daily values. These will be output to separate files.
+TX90pct and TN90pct heatwaves are also available. Daily values are available but only output one at a time. 
+These will be output to separate files.
 
 Global datasets are treated differently depending on which hemisphere the 
 data are in. The data are split by hemispheres, and summer heatwaves are
