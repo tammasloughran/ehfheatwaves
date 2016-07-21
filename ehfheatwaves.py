@@ -353,13 +353,13 @@ if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
             (calendar=='standard'):
     if keeptave:
         tave = tave[(dates.month!=2)|(dates.day!=29),...]
-        original_shape = (tave.shape[0], original_shape[1], original_shape[2])
+        original_shape = (tave.shape[0],) + original_shape[1:]
     if keeptmax:
         tmax = tmax[(dates.month!=2)|(dates.day!=29),...]
-        original_shape = (tmax.shape[0], original_shape[1], original_shape[2])
+        original_shape = (tmax.shape[0],) + original_shape[1:]
     if keeptmin:
         tmin = tmin[(dates.month!=2)|(dates.day!=29),...]
-        original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
+        original_shape = (tmin.shape[0],) + original_shape[1:]
     calendar = '365_day'
 
 # Remove incomplete starting year
@@ -369,13 +369,13 @@ if (dayone.month!=1)|(dayone.day!=1):
     start = np.argmax(dates.year==first_year)
     if keeptave:
         tave = tave[start:,...]
-        original_shape = (tave.shape[0], original_shape[1], original_shape[2])
+        original_shape = (tave.shape[0],) + original_shape[1:]
     if keeptmax:
         tmax = tmax[start:,...]
-        original_shape = (tmax.shape[0], original_shape[1], original_shape[2])
+        original_shape = (tmax.shape[0],) + original_shape[1:]
     if keeptmin:
         tmin = tmin[start:,...]
-        original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
+        original_shape = (tmin.shape[0],) + original_shape[1:]
 
 if options.verbose: print "Caclulating definition"
 # Calculate EHF
@@ -653,8 +653,34 @@ try:
 except KeyError:
     lonname = 'longitude'
     latname = 'latitude'
-    space = (tmaxnc.dimensions['latitude'].__len__(),
-            tmaxnc.dimensions['longitude'].__len__())
+    space = original_shape[1:]
+
+
+def station(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
+    stnc = Dataset('station_%s.nc'%(definition),'w')
+    stnc.createDimension('station',HWA.shape[1])
+    stnc.createDimension('time',HWA.shape[0])
+    stnc.createDimension('day', daysinyear)
+    otime = stnc.createVariable('time', 'f8', 'time',fill_value=-999.99)
+    otime[:] = range(first_year, daylast.year+1)
+    ostation = stnc.createVariable('station','f8','station',fill_value=-999.99)
+    ostation[:] = np.arange(0,HWA.shape[1],1)
+    otpct = stnc.createVariable('tpct','f8',('day','station'),fill_value=-999.99)
+    otpct[:] = tpct
+    ohwa = stnc.createVariable('HWA','f8',('time','station'),fill_value=-999.99)
+    ohwm = stnc.createVariable('HWM','f8',('time','station'),fill_value=-999.99)
+    ohwn = stnc.createVariable('HWN','f8',('time','station'),fill_value=-999.99)
+    ohwf = stnc.createVariable('HWF','f8',('time','station'),fill_value=-999.99)
+    ohwd = stnc.createVariable('HWD','f8',('time','station'),fill_value=-999.99)
+    ohwt = stnc.createVariable('HWT','f8',('time','station'),fill_value=-999.99)
+    ohwa[:] = HWA
+    ohwm[:] = HWM
+    ohwn[:] = HWN
+    ohwf[:] = HWF
+    ohwd[:] = HWD
+    ohwt[:] = HWT
+    stnc.close()
+
 
 def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
     """Save yearly data to netcdf file.
@@ -798,17 +824,55 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
 # Save yearly data to netcdf
 if yearlyout:
     if not options.noehf:
-        save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,tpct,"EHF")
-    if options.tx90pc: 
-        save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,txpct,"tx90pct")
+        if len(original_shape)<3: 
+            station(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,txpct,"EHF")
+        else:
+            save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,tpct,"EHF")
+    if options.tx90pc:
+        if len(original_shape)<3:
+            station(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,txpct,"tx90pct")
+        else:
+            save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,txpct,"tx90pct")
     if options.tn90pc:
-        save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,tnpct,"tn90pct")
+        if len(original_shape)<3:
+            station(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,txpct,"tn90pct")
+        else:
+            save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,tnpct,"tn90pct")
 
 # Save daily data to netcdf
 if dailyout:
     if options.daily or options.dailyonly: defn ='EHF'
     elif options.tx90pcd: defn = 'tx90pct'
     elif options.tn90pcd: defn = 'tn90pct'
+
+    if len(original_shape)<3:
+        dstnc = Dataset('station_daily_%s.nc'%(defn),'w')
+        dstnc.createDimension('time', original_shape[0])
+        dstnc.createDimension('station', original_shape[1])
+        otime = dstnc.createVariable('time','f8','time')
+        setattr(otime, 'units', 'days since %s-01-01'%(first_year))
+        ostation = dstnc.createVariable('station','f8','station')
+        oehf = dstnc.createVariable(defn,'f8',('time','station'),fill_value=-999.99)
+        oevent = dstnc.createVariable('event','f8',('time','station'),fill_value=-999.99)
+        oends = dstnc.createVariable('ends','f8',('time','station'),fill_value=-999.99)
+        if options.daily or options.dailyonly: 
+            exceed = EHF
+        elif options.tx90pcd:
+            exceed = txexceed
+            event = event_tx
+            ends = ends_tx
+        elif options.tn90pcd:
+            exceed = tnexceed
+            event = event_tn
+            ends = ends_tn
+        oehf[:] = exceed
+        oevent[:] = event
+        oends[:] = ends
+        dstnc.close()
+        import sys
+        sys.exit()
+
+
     dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'\
             %(defn, model, experiment, rip), mode='w')
     dailyout.createDimension('time', original_shape[0])
