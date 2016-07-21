@@ -395,13 +395,13 @@ if keeptmin or keeptmax:
         txexceed = np.ones(tmax.shape)*np.nan
         for i in xrange(0,tmax.shape[0]):
             idoy = i-daysinyear*int((i+1)/daysinyear)
-            txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
+            txexceed[i,...] = tmax[i,...]<txpct[idoy,...]
         txexceed[txexceed>0] = tmax[txexceed>0]
     if keeptmin:
         tnexceed = np.ones(tmin.shape)*np.nan
         for i in xrange(0,tmin.shape[0]):
             idoy = i-daysinyear*int((i+1)/daysinyear)
-            tnexceed[i,...] = tmin[i,...]>tnpct[idoy,...]
+            tnexceed[i,...] = tmin[i,...]<tnpct[idoy,...]
         tnexceed[tnexceed>0] = tmin[tnexceed>0]
 
 def identify_hw(ehfs):
@@ -551,9 +551,9 @@ def hw_aspects(EHF, season, hemisphere):
                 hw_mag.append(np.nanmean(hwdat))
             HWM[iyear,x] = np.nanmean(hw_mag)
             # Find the hottest heatwave magnitude
-            idex = np.where(hw_mag==max(hw_mag))[0][0]
+            idex = np.where(hw_mag==min(hw_mag))[0][0]
             # Find that heatwave's hottest day as EHF value.
-            HWA[iyear,x] = EHF_i[i[idex]:i[idex]+d[idex],x].max()
+            HWA[iyear,x] = EHF_i[i[idex]:i[idex]+d[idex],x].min()
     return HWA, HWM, HWN, HWF, HWD, HWT
 
 # Calculate metrics year by year
@@ -835,7 +835,7 @@ if yearlyout:
             save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,txpct,"tx90pct")
     if options.tn90pc:
         if len(original_shape)<3:
-            station(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,txpct,"tn90pct")
+            station(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,tnpct,"tn90pct")
         else:
             save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,tnpct,"tn90pct")
 
