@@ -187,7 +187,7 @@ else:
                 calendar=calendar)
         daylast = netcdftime.num2date(nctime[-1], nctime.units,
                 calendar=calendar)
-    dates = pd.date_range(str(dayone), str(daylast))
+    dates = pd.period_range(str(dayone), str(daylast))
     shorten = 0
     if (daylast.day!=30)|(daylast.month!=12):
         endofdata = dt.datetime(2000, daylast.month, daylast.day)
@@ -201,6 +201,7 @@ if options.maskfile:
     mask = masknc.variables[vname][:]
     if mask.max()>1: mask = mask>50
     mask = mask.astype(np.bool)
+    mask = np.squeeze(mask)
     masknc.close()
 
 # Load base period data
@@ -242,7 +243,7 @@ else:
     bpdaylast = netcdftime.num2date(bptime[-1], bptime.units, calendar=calendar)
 if calendar=='360_day': bpdates = calendar360(bpdayone, bpdaylast)
 else: 
-    bpdates = pd.date_range(str(bpdayone), str(bpdaylast))
+    bpdates = pd.period_range(str(bpdayone), str(bpdaylast))
     dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 tmax = tmaxnc.variables[options.tmaxvname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 tmin = tminnc.variables[options.tminvname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
