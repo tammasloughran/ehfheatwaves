@@ -288,8 +288,8 @@ if keeptmax: txpct = np.ones(((daysinyear,)+tmax.shape[1:]))*np.nan
 if keeptmin: tnpct = np.ones(((daysinyear,)+tmin.shape[1:]))*np.nan
 window = np.zeros(daysinyear,dtype=np.bool)
 wsize = 15.
-window[-np.floor(wsize/2.):] = 1
-window[:np.ceil(wsize/2.)] = 1
+window[-np.int(np.floor(wsize/2.)):] = 1
+window[:np.int(np.ceil(wsize/2.))] = 1
 window = np.tile(window,bpend+1-bpstart)
 if qtilemethod=='python':
     percentile = np.percentile
