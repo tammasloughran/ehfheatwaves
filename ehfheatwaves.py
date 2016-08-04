@@ -27,6 +27,7 @@ if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
     print "Please install numpy version 1.8.0 or higher."
     sys.exit(2)
 
+
 # Parse command line arguments
 usage = "usage: %prog -x <FILE> -n <FILE> -m <FILE> [options]"
 parser = OptionParser(usage=usage)
@@ -244,7 +245,7 @@ else:
 if calendar=='360_day': bpdates = calendar360(bpdayone, bpdaylast)
 else: 
     bpdates = pd.period_range(str(bpdayone), str(bpdaylast))
-    if calendar=='365_day': bpdates = bpdates[(bpdates.month!=2)|(bpdates!=29)]
+    if calendar=='365_day': bpdates = bpdates[(bpdates.month!=2)|(bpdates.day!=29)]
     dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 tmax = tmaxnc.variables[options.tmaxvname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 tmin = tminnc.variables[options.tminvname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
