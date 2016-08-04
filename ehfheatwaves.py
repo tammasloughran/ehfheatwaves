@@ -26,7 +26,6 @@ except ImportError:
 if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
     print "Please install numpy version 1.8.0 or higher."
     sys.exit(2)
-import pdb
 
 # Parse command line arguments
 usage = "usage: %prog -x <FILE> -n <FILE> -m <FILE> [options]"
@@ -188,6 +187,7 @@ else:
         daylast = netcdftime.num2date(nctime[-1], nctime.units,
                 calendar=calendar)
     dates = pd.period_range(str(dayone), str(daylast))
+    if calendar=='365_day': dates = dates[(dates.month!=2)|(dates.day!=29)]
     shorten = 0
     if (daylast.day!=30)|(daylast.month!=12):
         endofdata = dt.datetime(2000, daylast.month, daylast.day)
@@ -244,6 +244,7 @@ else:
 if calendar=='360_day': bpdates = calendar360(bpdayone, bpdaylast)
 else: 
     bpdates = pd.period_range(str(bpdayone), str(bpdaylast))
+    if calendar=='365_day': bpdates = bpdates[(bpdates.month!=2)|(bpdates!=29)]
     dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 tmax = tmaxnc.variables[options.tmaxvname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
 tmin = tminnc.variables[options.tminvname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
