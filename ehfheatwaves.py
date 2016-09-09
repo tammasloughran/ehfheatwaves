@@ -8,14 +8,11 @@ try:
     import numpy as np
     modulename = 'datetime'
     import datetime as dt
-    modulename = 'math'
-    import math
     modulename = 'qtiler'
     import qtiler
     modulename = 'netCDF4'
+    import netCDF4 as nc
     from netCDF4 import MFDataset, MFTime, Dataset
-    modulename = 'netcdftime'
-    import netcdftime
     modulename = 'optparse'
     from optparse import OptionParser
     modulename = 'distutils.version'
@@ -126,6 +123,7 @@ if options.tn90pc or options.tn90pcd: keeptmin = True
 keeptave = True
 if options.noehf: keeptave = False
 
+
 if options.verbose: print "Loading data"
 # Load time data
 try:
@@ -148,9 +146,9 @@ elif calendar=='360_day':
     # 360 day season start and end indices
     SHS = (300,450)
     SHW = (120,270)
-    dayone = netcdftime.num2date(nctime[0], nctime.units,
+    dayone = nc.num2date(nctime[0], nctime.units,
             calendar=calendar)
-    daylast = netcdftime.num2date(nctime[-1], nctime.units,
+    daylast = nc.num2date(nctime[-1], nctime.units,
             calendar=calendar)
     class calendar360():
         def __init__(self,sdate,edate):
@@ -183,9 +181,9 @@ else:
         dayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
         daylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(nd[6:]))
     else:
-        dayone = netcdftime.num2date(nctime[0], nctime.units,
+        dayone = nc.num2date(nctime[0], nctime.units,
                 calendar=calendar)
-        daylast = netcdftime.num2date(nctime[-1], nctime.units,
+        daylast = nc.num2date(nctime[-1], nctime.units,
                 calendar=calendar)
     dates = pd.period_range(str(dayone), str(daylast))
     if calendar=='365_day': dates = dates[(dates.month!=2)|(dates.day!=29)]
@@ -194,6 +192,7 @@ else:
         endofdata = dt.datetime(2000, daylast.month, daylast.day)
         shorten = dt.datetime(2000, 12, 31) - endofdata
         shorten = shorten.days
+
 
 # Load land-sea mask
 if options.maskfile:
@@ -204,6 +203,7 @@ if options.maskfile:
     mask = mask.astype(np.bool)
     mask = np.squeeze(mask)
     masknc.close()
+
 
 # Load base period data
 if options.bpfn:
@@ -240,8 +240,8 @@ if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
     bpdayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
     bpdaylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(nd[6:]))
 else:
-    bpdayone = netcdftime.num2date(bptime[0], bptime.units, calendar=calendar)
-    bpdaylast = netcdftime.num2date(bptime[-1], bptime.units, calendar=calendar)
+    bpdayone = nc.num2date(bptime[0], bptime.units, calendar=calendar)
+    bpdaylast = nc.num2date(bptime[-1], bptime.units, calendar=calendar)
 if calendar=='360_day': bpdates = calendar360(bpdayone, bpdaylast)
 else: 
     bpdates = pd.period_range(str(bpdayone), str(bpdaylast))
@@ -272,6 +272,7 @@ if keeptave: tave_base = (tmax + tmin)/2.
 if not keeptmin: del tmin
 if not keeptmax: del tmax
 
+
 # Remove leap days in gregorian calendars
 if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
             (calendar=='standard'):
@@ -282,6 +283,7 @@ if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
     if keeptmin:
         tmin = tmin[(dates_base.month!=2)|(dates_base.day!=29),...]
     del dates_base
+
 
 if options.verbose: print "Calculating percentiles"
 # Caclulate 90th percentile
@@ -351,6 +353,7 @@ if keeptave: tave = (tmax + tmin)/2.
 if not keeptmin: del tmin
 if not keeptmax: del tmax
 
+
 # Remove leap days from tave
 if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
             (calendar=='standard'):
@@ -364,6 +367,7 @@ if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
         tmin = tmin[(dates.month!=2)|(dates.day!=29),...]
         original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
     calendar = '365_day'
+
 
 # Remove incomplete starting year
 first_year = dayone.year
@@ -380,6 +384,7 @@ if (dayone.month!=1)|(dayone.day!=1):
         tmin = tmin[start:,...]
         original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
 
+
 if options.verbose: print "Caclulating definition"
 # Calculate EHF
 if not options.noehf:
@@ -391,6 +396,7 @@ if not options.noehf:
                 tpct[i-daysinyear*int((i+1)/daysinyear),...]
         EHF[i,...] = np.maximum(EHIaccl,1.)*EHIsig
     EHF[EHF<0] = 0
+
 
 # Tx90pc exceedences
 if keeptmin or keeptmax:
@@ -406,6 +412,7 @@ if keeptmin or keeptmax:
             idoy = i-daysinyear*int((i+1)/daysinyear)
             tnexceed[i,...] = tmin[i,...]>tnpct[idoy,...]
         tnexceed[tnexceed>0] = tmin[tnexceed>0]
+
 
 def identify_hw(ehfs):
     """identify_hw locates heatwaves from EHF and returns an event indicator 
@@ -437,6 +444,7 @@ def identify_hw(ehfs):
     endss[endss<3] = 0
     return events, endss
 
+
 def identify_semi_hw(ehfs):
     """identify_hw locates heatwaves from EHF and returns an event indicator 
     and a duration indicator.
@@ -462,12 +470,14 @@ def identify_semi_hw(ehfs):
     events = events.astype(np.bool)
     return events, endss
 
+
 # Calcilate daily output
 if options.daily: event, ends = identify_hw(EHF)
 if options.tx90pcd: 
     event_tx, ends_tx = identify_hw(txexceed)
 if options.tn90pcd: 
     event_tn, ends_tn = identify_hw(tnexceed)
+
 
 nyears = len(range(first_year,daylast.year+1))
 def hw_aspects(EHF, season, hemisphere):
@@ -559,6 +569,7 @@ def hw_aspects(EHF, season, hemisphere):
             HWA[iyear,x] = EHF_i[i[idex]:i[idex]+d[idex],x].max()
     return HWA, HWM, HWN, HWF, HWD, HWT
 
+
 # Calculate metrics year by year
 def split_hemispheres(EHF):
     """split_hemispheres splits the input data by hemispheres, and glues them
@@ -614,6 +625,7 @@ def split_hemispheres(EHF):
         HWT = HWT_s
     return HWA, HWM, HWN, HWF, HWD, HWT
 
+
 # Calculate yearly output
 if yearlyout:
     if options.verbose: print "Calculating yearly aspects"
@@ -629,6 +641,7 @@ if yearlyout:
     if options.tn90pc:
         HWA_tn, HWM_tn, HWN_tn, HWF_tn, HWD_tn, HWT_tn = \
                 split_hemispheres(tnexceed)
+
 
 if options.verbose: print "Saving"
 # Save to netCDF
@@ -658,6 +671,7 @@ except KeyError:
     latname = 'latitude'
     space = (tmaxnc.dimensions['latitude'].__len__(),
             tmaxnc.dimensions['longitude'].__len__())
+
 
 def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
     """Save yearly data to netcdf file.
@@ -798,6 +812,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
         HWTout[:] = HWT.reshape((nyears,)+space)
     yearlyout.close()
 
+
 # Save yearly data to netcdf
 if yearlyout:
     if not options.noehf:
@@ -806,6 +821,7 @@ if yearlyout:
         save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,txpct,"tx90pct")
     if options.tn90pc:
         save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,tnpct,"tn90pct")
+
 
 # Save daily data to netcdf
 if dailyout:
