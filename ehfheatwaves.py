@@ -128,9 +128,9 @@ if options.noehf: keeptave = False
 
 if options.verbose: print "Loading data"
 # Load time data
-try:
+if '?' in options.tmaxfile or '*' in options.tmaxfile or '[' in options.tmaxfile:
     tmaxnc = MFDataset(options.tmaxfile, 'r')
-except IndexError:
+else:
     tmaxnc = Dataset(options.tmaxfile, 'r')
 nctime = tmaxnc.variables[options.timevname]
 try:
