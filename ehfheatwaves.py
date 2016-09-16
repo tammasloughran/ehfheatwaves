@@ -205,24 +205,24 @@ if options.maskfile:
 
 # Load base period data
 if options.bpfn:
-    try:
+    if '?' in options.bpfn or '*' in options.bpfn or '[' in options.bpfn:
         tminnc = MFDataset(options.bpfn, 'r')
-    except IndexError:
+    else:
         tminnc = Dataset(options.bpfn, 'r')
 else:
-    try:
+    if '?' in options.tminfile or '*' in options.tminfile or '[' in options.tminfile:
         tminnc = MFDataset(options.tminfile, 'r')
-    except IndexError:
+    else:
         tminnc = Dataset(options.tminfile, 'r')
 if options.bpfx:
-    try:
+    if '?' in options.bpfx or '*' in options.bpfx or '[' in options.bpfx:
         tmaxnc = MFDataset(options.bpfx, 'r')
-    except IndexError:
+    else:
         tmaxnc = Dataset(options.bpfx, 'r')
 else:
-    try:
+    if '?' in options.tmaxfile or '*' in options.tmaxfile or '[' in options.tmaxfile:
         tmaxnc = MFDataset(options.tmaxfile, 'r')
-    except IndexError:
+    else:
         tmaxnc = Dataset(options.tmaxfile, 'r')
 vname = options.tmaxvname
 bptime = tmaxnc.variables[options.timevname]
@@ -315,13 +315,13 @@ del window
 
 if options.verbose: print "Loading data"
 # Load all data
-try:
+if '?' in options.tminfile or '*' in options.tminfile or '[' in options.tminfile:
     tminnc = MFDataset(options.tminfile, 'r')
-except IndexError:
+else:
     tminnc = Dataset(options.tminfile, 'r')
-try:
+if '?' in options.tmaxfile or '*' in options.tmaxfile or '[' in options.tmaxfile:
     tmaxnc = MFDataset(options.tmaxfile, 'r')
-except IndexError:
+else:
     tmaxnc = Dataset(options.tmaxfile, 'r')
 tmax = tmaxnc.variables[options.tmaxvname][:]
 if len(tmax.shape)==4: tmax = tmax.squeeze()
@@ -662,17 +662,44 @@ def station(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
     stnc.createDimension('time',HWA.shape[0])
     stnc.createDimension('day', daysinyear)
     otime = stnc.createVariable('time', 'f8', 'time',fill_value=-999.99)
+    setattr(otime, 'units', 'year')
     otime[:] = range(first_year, daylast.year+1)
     ostation = stnc.createVariable('station','f8','station',fill_value=-999.99)
-    ostation[:] = np.arange(0,HWA.shape[1],1)
+    setattr(ostation, 'description', 'Station ID')
+    ostation[:] = tmaxnc.variables['stationid'][:]
     otpct = stnc.createVariable('tpct','f8',('day','station'),fill_value=-999.99)
+    setattr(otpct, 'description', 'Day-of-year %s th percentile thresholds'%(pcntl))
     otpct[:] = tpct
     ohwa = stnc.createVariable('HWA','f8',('time','station'),fill_value=-999.99)
+    setattr(ohwa, 'long_name', 'Heatwave Amplitude')
+    if definition=='EHF':
+        setattr(ohwa, 'units','degC2')
+    else:
+        setattr(ohwa, 'units','degC')
+    setattr(ohwa, 'description', 'The hottest day of the hottest heatwave')
     ohwm = stnc.createVariable('HWM','f8',('time','station'),fill_value=-999.99)
+    setattr(ohwm, 'long_name', 'Heatwave Magnitude')
+    if definition=='EHF':
+        setattr(ohwm, 'units','degC2')
+    else:
+        setattr(ohwm, 'units','degC')
+    setattr(ohwm, 'description', 'The mean heatwave intensity')
     ohwn = stnc.createVariable('HWN','f8',('time','station'),fill_value=-999.99)
+    setattr(ohwn, 'long_name', 'Heatwave Number')
+    setattr(ohwn, 'units','heatwaves')
+    setattr(ohwa, 'description', 'The number of heatwave events per season')
     ohwf = stnc.createVariable('HWF','f8',('time','station'),fill_value=-999.99)
+    setattr(ohwf, 'long_name', 'Heatwave Frequency')
+    setattr(ohwf, 'units','days')
+    setattr(ohwf, 'description', 'The number of heatwave days per season')
     ohwd = stnc.createVariable('HWD','f8',('time','station'),fill_value=-999.99)
+    setattr(ohwd, 'long_name', 'Heatwave Duration')
+    setattr(ohwd, 'units','days')
+    setattr(ohwd, 'description', 'The duration of the longest heatwave of the season')
     ohwt = stnc.createVariable('HWT','f8',('time','station'),fill_value=-999.99)
+    setattr(ohwt, 'long_name', 'Heatwave Timing')
+    setattr(ohwt, 'units','days')
+    setattr(ohwt, 'description', 'The duration of the longest heatwave of the season')
     ohwa[:] = HWA
     ohwm[:] = HWM
     ohwn[:] = HWN
@@ -851,10 +878,17 @@ if dailyout:
         dstnc.createDimension('station', original_shape[1])
         otime = dstnc.createVariable('time','f8','time')
         setattr(otime, 'units', 'days since %s-01-01'%(first_year))
+        setattr(otime, 'calendar', calendar)
         ostation = dstnc.createVariable('station','f8','station')
+        setattr(ostation, 'description', 'Station ID')
         oehf = dstnc.createVariable(defn,'f8',('time','station'),fill_value=-999.99)
+        setattr(oehf, 'description', 'Values that exceed threshold')
         oevent = dstnc.createVariable('event','f8',('time','station'),fill_value=-999.99)
+        setattr(oevent, 'description', 'Binary indicator for whether heatwave is happening')
         oends = dstnc.createVariable('ends','f8',('time','station'),fill_value=-999.99)
+        setattr(oends, 'description', 'Duration of heatwave at the start of heatwave')
+        otime[:] = range(0,original_shape[0],1)
+        ostation[:] = tmaxnc.variables['stationid'][:]
         if options.daily or options.dailyonly: 
             exceed = EHF
         elif options.tx90pcd:
