@@ -1,5 +1,5 @@
 # ehfheatwaves
-A script to calculate heatwaves from AWAP and CMIP5 gridded datasets.
+A script to calculate heatwaves from gridded datasets.
 
 The original intention of this program was to provide daily EHF values and
 heatwave indicators for any season rather than just annual or seasonal
