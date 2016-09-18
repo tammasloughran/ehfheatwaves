@@ -699,7 +699,7 @@ def station(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
     ohwt = stnc.createVariable('HWT','f8',('time','station'),fill_value=-999.99)
     setattr(ohwt, 'long_name', 'Heatwave Timing')
     setattr(ohwt, 'units','days')
-    setattr(ohwt, 'description', 'The duration of the longest heatwave of the season')
+    setattr(ohwt, 'description', 'First heat wave day of the season')
     ohwa[:] = HWA
     ohwm[:] = HWM
     ohwn[:] = HWN
