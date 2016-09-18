@@ -19,7 +19,6 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
     q -- quantile at pth percentile
     """
     import numpy as np
-    import math
     # Convert the percentile to a fraction
     if not fraction:
         p = p/100.
@@ -161,7 +160,7 @@ def quantile_zhang(y, p, fraction=False, rmnans=False):
         Qp = np.ones(spacedim)*np.nan
         for lat in range(spacedim):
             array = np.sort(y[:,lat])
-            Qp[lat] = intrpl(y,j)
+            Qp[lat] = intrpl(array,j)
         Qp = Qp.reshape(oldshape)
     return Qp
 

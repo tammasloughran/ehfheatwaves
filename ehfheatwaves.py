@@ -87,7 +87,7 @@ if not options.tmaxfile or not options.tminfile:
     print "Please specify tmax and tmin files."
     sys.exit(2)
 if not options.maskfile:
-    print ("You didn't specify a land-sea mask. It's faster if you do,"
+    print ("You didn't specify a land-sea mask. It's faster if you do, "
         "so this might take a while.")
 if len(options.bp)!=9:
     print "Incorect base period format."
@@ -678,7 +678,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
     """
     yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, 
         model, experiment, rip, season), 'w')
-    yearlyout.createDimension('time', len(range(first_year, daylast.year+1)))
+    yearlyout.createDimension('time', size=None)
     yearlyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
     yearlyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
     yearlyout.createDimension('day', daysinyear)
@@ -830,7 +830,7 @@ if dailyout:
     elif options.tn90pcd: defn = 'tn90pct'
     dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'\
             %(defn, model, experiment, rip), mode='w')
-    dailyout.createDimension('time', original_shape[0])
+    dailyout.createDimension('time', size=None)
     dailyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
     dailyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
     setattr(dailyout, "author", "Tammas Loughran")
