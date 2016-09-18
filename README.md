@@ -1,11 +1,12 @@
 # ehfheatwaves
-A script to calculate heatwaves from AWAP and CMIP5 gridded datasets.
+A script to calculate heatwaves from gridded datasets.
 
 The original intention of this program was to provide daily EHF values and
 heatwave indicators for any season rather than just annual or seasonal
 heatwave aspects. The script has been improved to handle CMIP5 quirks
 such different calendars.
 
+```
 Usage: ehfheatwaves.py -x <FILE> -n <FILE> -m <FILE> [options]
 
 Options:
@@ -37,14 +38,13 @@ Options:
   --noehf               Supress EHF output and only use the specified t90pc
   -v                    Verbose
   --old-method          Use the old definition of within-season heatwaves
-
+```
 
 Required packages (prefereably the latest versions)  
  * numpy
  * datetime
  * pandas
  * netCDF4
- * netcdftime
  * optparse
 
 Notes:  
