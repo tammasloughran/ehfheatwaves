@@ -46,7 +46,7 @@ testnc.close()
 chwdata = np.load('hwdata.npy')
 
 # Take the difference between the test and comparison data
-difference = thwdata - chwdata
+difference = abs(thwdata - chwdata)
 
 # Compare difference to a threshold
 threshold = 0.00001
