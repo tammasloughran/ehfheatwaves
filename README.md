@@ -48,6 +48,9 @@ Required packages (prefereably the latest versions)
  * optparse
 
 Notes:  
+
+IF YOU PUBLISH ANY RESEARCH OR OTHER WORK THAT USES THIS SOFTWARE, PLEASE CITE MYSELF AND THIS GITHUB REPOSITORY IN THE ACKNOWLEDGMENTS SECTION OF YOUR PAPER. SEND THE FINAL PRINT AS I WOULD ALSO BE INTERESTD IN READING YOUR WORK TOO. THANK YOU.
+
 You must provide a tasmax file, tasmin file. A land sea mask is optional but recommended.  
 e.g. python ehfheatwaves.py -x "/direcory/tasmax_\*" -n "/direcory/tasmin_*" -m "/direcory/mask.nc" -d  
 Make sure to use quotes if specifying multiple files with wild cards
@@ -81,3 +84,4 @@ This script is not parallelized.
 To do list:
  * Save EHIs to file
  * Use standard metadata conventions
+
