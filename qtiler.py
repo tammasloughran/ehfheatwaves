@@ -1,3 +1,8 @@
+"""qtiler module contains functions that calculate quantiles using various
+interpolation methods.
+"""
+
+
 def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
     """quantile function used in R
 
@@ -7,7 +12,7 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
     default method used in Matlab. 7 is the default used in R and Python.
     See: Hyndman, R. J. and Fan, Y. (1996) Sample quantiles in statistical
     packages, American Statistician, 50, 361-365.
-    
+
     Arguments
     x -- array
     p -- percentile
@@ -38,12 +43,12 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
         m = 0.
         j = np.floor(p*n + m)
         g = n*p + m - j
-        if g==0: 
+        if g==0:
             gamma = 0.
         else:
             gamma = 1.
         return (1. - gamma)*x[j-1] + gamma*x[j]
-    
+
     def two(x,p,n):
         m = 0.
         j = np.floor(p*n + m)
@@ -69,19 +74,19 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
         j = np.floor(p*n + m)
         gamma = n*p + m - j
         return (1. - gamma)*x[j-1] + gamma*x[j]
-    
+
     def five(x,p,n):
         m = 0.5
         j = np.floor(p*n + m)
         gamma = n*p + m - j
         return (1. - gamma)*x[j-1] + gamma*x[j]
-    
+
     def six(x,p,n):
         m = p
         j = np.floor(p*n + m)
         gamma = n*p + m - j
         return (1. - gamma)*x[j-1] + gamma*x[j]
-        
+
     def seven(x,p,n):
         m = 1. - p
         j = np.floor(p*n + m)
@@ -104,22 +109,23 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
             7: seven, 8: eight, 9: nine}
     return switcher[itype](x,p,n)
 
+
 def quantile_zhang(y, p, fraction=False, rmnans=False):
     """Caclulate the pth percentile value of an array y using the Zhang method.
-    
+
     The linear interpolation method used is outlined in Zhang et al., 2005,
     Avoiding Inhomogeneity in Percentile-Based Indices of Temperature Extremes,
     Journal of Climate, vol. 18. The interpolation is given as:
         Qp =  (1-f)*y_j + f*y_j+1
     p<1/(n+1) are set to the smallest value in y
     p>n/(n+1) are set to the largest value in y
-    
+
     Arguments
     y -- array
     p -- pth percentile
     fraction -- boolean indicates if percentile is a fraction 0<p<1.
     rmnans -- boolean indicates whether or not to remove nans
-    
+
     Returns
     Qp -- qualtile of pth percentile
     """
@@ -163,6 +169,7 @@ def quantile_zhang(y, p, fraction=False, rmnans=False):
             Qp[lat] = intrpl(array,j)
         Qp = Qp.reshape(oldshape)
     return Qp
+
 
 def quantile_climpact(y,p,fraction=False):
     """quantile function used by climpact.
