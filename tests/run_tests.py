@@ -5,6 +5,7 @@ calculated by climpact2 R package, and runs some basic unit tests.
 import os
 import netCDF4 as nc
 import sys
+sys.path.append('../')
 import numpy as np
 import unittest
 from ehfheatwaves import *
@@ -42,12 +43,12 @@ class TestRQtiler(unittest.TestCase):
 
 
 if __name__=='__main__':
-    # First test the script as a whiole against climpact2 data.
+    # First test the script as a whole against climpact2 data.
     # Define command and arguments
     if sys.version[0]=='3':
-        run_comnd = 'python3 ehfheatwaves.py'
+        run_comnd = 'python3 ../ehfheatwaves.py'
     else:
-        run_comnd = 'python ehfheatwaves.py'
+        run_comnd = 'python ../ehfheatwaves.py'
     arguments = ' -x climpact2.sampledata.gridded.1991-2010.nc' \
         ' -n climpact2.sampledata.gridded.1991-2010.nc' \
         ' --vnamex=tmax' \
