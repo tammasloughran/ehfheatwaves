@@ -41,7 +41,7 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
     # Switch case functions for interpolation type
     def one(x,p,n):
         m = 0.
-        j = np.floor(p*n + m)
+        j = int(np.floor(p*n + m))
         g = n*p + m - j
         if g==0:
             gamma = 0.
@@ -51,7 +51,7 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
 
     def two(x,p,n):
         m = 0.
-        j = np.floor(p*n + m)
+        j = int(np.floor(p*n + m))
         g = n*p + m - j
         if g==0:
             gamma = 0.5
@@ -61,7 +61,7 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
 
     def three(x,p,n):
         m = -0.5
-        j = np.floor(p*n + m)
+        j = int(np.floor(p*n + m))
         g = n*p + m - j
         if (g==0)&(j%2==0):
             gamma = 0.
@@ -71,37 +71,37 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
 
     def four(x,p,n):
         m = 0.
-        j = np.floor(p*n + m)
+        j = int(np.floor(p*n + m))
         gamma = n*p + m - j
         return (1. - gamma)*x[j-1] + gamma*x[j]
 
     def five(x,p,n):
         m = 0.5
-        j = np.floor(p*n + m)
+        j = int(np.floor(p*n + m))
         gamma = n*p + m - j
         return (1. - gamma)*x[j-1] + gamma*x[j]
 
     def six(x,p,n):
         m = p
-        j = np.floor(p*n + m)
+        j = int(np.floor(p*n + m))
         gamma = n*p + m - j
         return (1. - gamma)*x[j-1] + gamma*x[j]
 
     def seven(x,p,n):
         m = 1. - p
-        j = np.floor(p*n + m)
+        j = int(np.floor(p*n + m))
         gamma = n*p + m - j
         return (1. - gamma)*x[j-1] + gamma*x[j]
 
     def eight(x,p,n):
         m = (p+1)/3.
-        j = np.floor(p*n + m)
+        j = int(np.floor(p*n + m))
         gamma = n*p + m - j
         return (1. - gamma)*x[j-1] + gamma*x[j]
 
     def nine(x,p,n):
         m = p/4. + 3./8.
-        j = np.floor(p*n + m)
+        j = int(np.floor(p*n + m))
         gamma = n*p + m - j
         return (1. - gamma)*x[j-1] + gamma*x[j]
 
