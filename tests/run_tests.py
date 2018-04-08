@@ -58,28 +58,28 @@ class TestZhangQtiler(unittest.TestCase):
     testdata = np.array([1,2,3,4,5,6,7,8,9])
 
     def testNegativeP(self):
-        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,-1))
+        self.assertRaises(ValueError,qtiler.quantile_zhang(self.testdata,-1))
 
     def testZeroP(self):
-        self.assertEqual(qtiler.quantile_R(self.testdata,0), min(self.testdata))
+        self.assertEqual(qtiler.quantile_zhang(self.testdata,0), min(self.testdata))
 
     def testHundredP(self):
-        self.assertEqual(qtiler.quantile_R(self.testdata,100), max(self.testdata))
+        self.assertEqual(qtiler.quantile_zhang(self.testdata,100), max(self.testdata))
 
     def testHundredPlusP(self):
-        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,101))
+        self.assertRaises(ValueError,qtiler.quantile_zhang(self.testdata,101))
 
     def testFractionOneP(self):
-        self.assertEqual(qtiler.quantile_R(self.testdata,1,fraction=True), max(self.testdata))
+        self.assertEqual(qtiler.quantile_zhang(self.testdata,1,fraction=True), max(self.testdata))
 
     def testPercentAsFraction(self):
-        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,50,fraction=True))
+        self.assertRaises(ValueError,qtiler.quantile_zhang(self.testdata,50,fraction=True))
 
     def testFractionAsPercent(self):
-        self.assertRaises(Warning,qtiler.quantile_R(self.testdata,0.5,fraction=False))
+        self.assertRaises(Warning,qtiler.quantile_zhang(self.testdata,0.5,fraction=False))
 
     def testInvalidItype(self):
-        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,50,itype=0))
+        self.assertRaises(ValueError,qtiler.quantile_zhang(self.testdata,50,itype=0))
 
     def testKnownCase(self):
         self.assertEqual(qtiler.quantile_zhang(self.testdata,70),7.0)
