@@ -1,6 +1,12 @@
-"""run_tests.py tests the accuracy of ehfheatwaves.py compared to heatwave data
-calculated by climpact2 R package, and runs some basic unit tests.
+#!/usr/bin python3
+# -*- coding: utf-8 -*-
 """
+run_tests.py tests the accuracy of ehfheatwaves.py compared to heatwave data
+calculated by climpact2 R package, and runs some basic unit tests.
+
+@author: Tammas Loughran
+"""
+
 # Load modules
 import os
 import netCDF4 as nc
@@ -40,6 +46,43 @@ class TestRQtiler(unittest.TestCase):
 
     def testInvalidItype(self):
         self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,50,itype=0))
+
+    def testKnownCases(self):
+        knownCases = ((1,7),(2,7),(3,6),(4,6.3),(5,6.8),(6,7),(7, 6.6), (8, 6.866667), (9,6.85))
+        for case in knownCases:
+            self.assertAlmostEqual(qtiler.quantile_R(self.testdata,70,itype=case[0]),case[1],places=6)
+
+class TestZhangQtiler(unittest.TestCase):
+    """Test the Zhang quantile function"""
+
+    testdata = np.array([1,2,3,4,5,6,7,8,9])
+
+    def testNegativeP(self):
+        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,-1))
+
+    def testZeroP(self):
+        self.assertEqual(qtiler.quantile_R(self.testdata,0), min(self.testdata))
+
+    def testHundredP(self):
+        self.assertEqual(qtiler.quantile_R(self.testdata,100), max(self.testdata))
+
+    def testHundredPlusP(self):
+        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,101))
+
+    def testFractionOneP(self):
+        self.assertEqual(qtiler.quantile_R(self.testdata,1,fraction=True), max(self.testdata))
+
+    def testPercentAsFraction(self):
+        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,50,fraction=True))
+
+    def testFractionAsPercent(self):
+        self.assertRaises(Warning,qtiler.quantile_R(self.testdata,0.5,fraction=False))
+
+    def testInvalidItype(self):
+        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,50,itype=0))
+
+    def testKnownCase(self):
+        self.assertEqual(qtiler.quantile_zhang(self.testdata,70),7.0)
 
 
 if __name__=='__main__':

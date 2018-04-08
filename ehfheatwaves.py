@@ -1,3 +1,12 @@
+#!/usr/bin/ python3
+# -*- coding: utf-8 -*-
+"""
+ehfheatwaves.py calculates heatwave indices and characteristics from
+temperature data.
+
+@author: Tammas Loughran
+"""
+
 import warnings
 warnings.filterwarnings('ignore')
 import sys

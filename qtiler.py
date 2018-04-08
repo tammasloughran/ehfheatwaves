@@ -1,5 +1,10 @@
-"""qtiler module contains functions that calculate quantiles using various
+#!/usr/bin python3
+# -*- coding: utf-8 -*-
+"""
+qtiler.py module contains functions that calculate quantiles using various
 interpolation methods.
+
+@author: Tammas Loughran
 """
 
 
