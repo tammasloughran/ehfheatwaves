@@ -67,7 +67,8 @@ def identify_hw(ehfs):
 
 def identify_semi_hw(ehfs):
     """identify_hw locates heatwaves from EHF and returns an event indicator
-    and a duration indicator.
+    and a duration indicator. This function does not exclude events less than
+    three days in duration.
     """
     # Agregate consecutive days with EHF>0
     # First day contains duration
