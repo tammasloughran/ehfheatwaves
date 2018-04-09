@@ -15,7 +15,7 @@ sys.path.append('../')
 import numpy as np
 import datetime as dt
 import unittest
-from ehfheatwaves import calendar360, identify_hw
+from ehfheatwaves import *
 import qtiler
 
 
@@ -26,7 +26,7 @@ class TestRQtiler(unittest.TestCase):
 
     def testNegativeP(self):
         """p < 0 should return an exception error."""
-        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,-1))
+        self.assertRaises(ValueError, qtiler.quantile_R, self.testdata, -1)
 
     def testZeroP(self):
         """p = 0 should return the lowest value."""
@@ -38,7 +38,7 @@ class TestRQtiler(unittest.TestCase):
 
     def testHundredPlusP(self):
         """p > 100 should return an exception error."""
-        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,101))
+        self.assertRaises(ValueError, qtiler.quantile_R, self.testdata, 101)
 
     def testFractionOneP(self):
         """p = 1 as a fraction should return the largest value."""
@@ -46,14 +46,14 @@ class TestRQtiler(unittest.TestCase):
 
     def testPercentAsFraction(self):
         """p (when fraction) > 1 should return an exception Error."""
-        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,50,fraction=True))
+        self.assertRaises(ValueError, qtiler.quantile_R, self.testdata, 50, fraction=True)
 
     def testFractionAsPercent(self):
         """p (when percent) < 1 should give a warning."""
-        self.assertWarns(Warning,qtiler.quantile_R(self.testdata,0.5,fraction=False))
+        self.assertWarns(Warning, qtiler.quantile_R, self.testdata, 0.5, fraction=False)
 
     def testInvalidItype(self):
-        self.assertRaises(ValueError,qtiler.quantile_R(self.testdata,50,itype=0))
+        self.assertRaises(KeyError, qtiler.quantile_R, self.testdata, 50, itype=0)
 
     def testKnownCases(self):
         """Test known cases for corectness."""
@@ -69,7 +69,7 @@ class TestZhangQtiler(unittest.TestCase):
 
     def testNegativeP(self):
         """p < 0 should return an exception error."""
-        self.assertRaises(ValueError,qtiler.quantile_zhang(self.testdata,-1))
+        self.assertRaises(ValueError, qtiler.quantile_zhang, self.testdata, -1)
 
     def testZeroP(self):
         """p = 0 should return the lowest value."""
@@ -81,7 +81,7 @@ class TestZhangQtiler(unittest.TestCase):
 
     def testHundredPlusP(self):
         """p > 100 should return an exception error."""
-        self.assertRaises(ValueError,qtiler.quantile_zhang(self.testdata,101))
+        self.assertRaises(ValueError, qtiler.quantile_zhang, self.testdata, 101)
 
     def testFractionOneP(self):
         """p = 1 as a fraction should return the largest value."""
@@ -89,11 +89,11 @@ class TestZhangQtiler(unittest.TestCase):
 
     def testPercentAsFraction(self):
         """p (when fraction) > 1 should return an exception Error."""
-        self.assertRaises(ValueError,qtiler.quantile_zhang(self.testdata,50,fraction=True))
+        self.assertRaises(ValueError, qtiler.quantile_zhang, self.testdata, 50, fraction=True)
 
     def testFractionAsPercent(self):
         """p (when percent) < 1 should give a warning."""
-        self.assertWarns(Warning,qtiler.quantile_zhang(self.testdata,0.5,fraction=False))
+        self.assertWarns(Warning, qtiler.quantile_zhang, self.testdata,  0.5, fraction=False)
 
     def testKnownCase(self):
         """Test a known case for corectness."""
@@ -107,7 +107,7 @@ class TestClimpactQtiler(unittest.TestCase):
 
     def testNegativeP(self):
         """p < 0 should return an exception error."""
-        self.assertRaises(ValueError,qtiler.quantile_climpact(self.testdata,-1))
+        self.assertRaises(ValueError, qtiler.quantile_climpact, self.testdata, -1)
 
     def testZeroP(self):
         """p = 0 should return the lowest value."""
@@ -119,7 +119,7 @@ class TestClimpactQtiler(unittest.TestCase):
 
     def testHundredPlusP(self):
         """p > 100 should return an exception error."""
-        self.assertRaises(ValueError,qtiler.quantile_climpact(self.testdata,101))
+        self.assertRaises(ValueError, qtiler.quantile_climpact, self.testdata, 101)
 
     def testFractionOneP(self):
         """p = 1 as a fraction should return the largest value."""
@@ -127,11 +127,11 @@ class TestClimpactQtiler(unittest.TestCase):
 
     def testPercentAsFraction(self):
         """p (when fraction) > 1 should return an exception Error."""
-        self.assertRaises(ValueError,qtiler.quantile_climpact(self.testdata,50,fraction=True))
+        self.assertRaises(ValueError, qtiler.quantile_climpact, self.testdata, 50, fraction=True)
 
     def testFractionAsPercent(self):
         """p (when percent) < 1 should give a warning."""
-        self.assertRaises(Warning,qtiler.quantile_climpact(self.testdata,0.5,fraction=False))
+        self.assertRaises(Warning, qtiler.quantile_climpact, self.testdata, 0.5, fraction=False)
 
     def testKnownCase(self):
         """Test a known case for corectness."""
@@ -146,16 +146,16 @@ class TestCalendar360(unittest.TestCase):
 
     def testEndBeforeStart(self):
         """Should return an exception if the end date is before the start date."""
-        self.assertRaises(ValueError, calendar360(self.enddate,self.startdate))
+        self.assertRaises(DatesOrderError, calendar360, self.enddate, self.startdate)
 
     def testAtributes(self):
-        """calendar object should contain 3 attributes contaning arrays."""
+        """Calendar object should contain 3 attributes contaning arrays."""
         self.assertIs(type(self.calendar.day), np.ndarray)
         self.assertIs(type(self.calendar.month), np.ndarray)
         self.assertIs(type(self.calendar.year), np.ndarray)
 
     def testIndexable(self):
-        """calendar object should be indexable, which returns a date."""
+        """Calendar object should be indexable, which returns a date."""
         self.assertIs(type(self.calendar[0]), dt.datetime)
 
 
@@ -171,7 +171,7 @@ class TestIdentifyHW(unittest.TestCase):
     known_ends = np.array([0,0,0,0,0,3,0,0,0,5,0,0,0,0,0])
 
     def testReturnTupple(self):
-        """Should return a tupple containging the event indicator and the durations (numpy.ndarrays)."""
+        """Should return a tupple containging the event indicator and the durations (numpy.ndarray)."""
         result = identify_hw(self.ehfdata)
         self.assertIs(tuple, type(result))
         self.assertIs(np.ndarray, type(result[0]))
@@ -180,8 +180,8 @@ class TestIdentifyHW(unittest.TestCase):
     def testKnownEventsEnds(self):
         """Tests the known cases."""
         events, ends = identify_hw(self.ehfdata)
-        self.assertEqual(events, self.known_events)
-        self.assertEqual(ends, self.known_ends)
+        self.assertTrue((events==self.known_events).all())
+        self.assertTrue((ends==self.known_ends).all())
 
     def testShape(self):
         """The shape of the input EHF index and the outputs should be the same."""
@@ -212,8 +212,8 @@ class TestIdentifySemiHW(unittest.TestCase):
     def testKnownEventsEnds(self):
         """Tests the known cases."""
         events, ends = identify_hw(self.ehfdata)
-        self.assertEqual(events, self.known_events)
-        self.assertEqual(ends, self.known_ends)
+        self.assertTrue((events==self.known_events).all())
+        self.assertTrue((ends==self.known_ends).all())
 
     def testShape(self):
         """The shape of the input EHF index and the outputs should be the same."""

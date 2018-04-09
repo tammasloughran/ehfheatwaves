@@ -34,6 +34,17 @@ if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
     sys.exit(2)
 
 
+class DatesOrderError(Exception):
+    """Exception to be raised when the calendar start day occurs before the end day"""
+
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+        print("Calendar end date appears before the start date")
+        print("start: ", self.start)
+        print("end: ", self.end)
+
+
 def identify_hw(ehfs):
     """identify_hw locates heatwaves from EHF and returns an event indicator
     and a duration indicator.
@@ -93,7 +104,10 @@ def identify_semi_hw(ehfs):
 
 
 class calendar360():
+    """Creates a calendar object with 360 days per year."""
+
     def __init__(self,sdate,edate):
+        if sdate>edate: raise DatesOrderError(sdate,edate)
         self.year = np.repeat(range(sdate.year,edate.year+1), 360, 0)
         nyears = len(range(sdate.year,edate.year+1))
         self.month = np.tile(np.repeat(range(1,12+1), 30, 0), nyears)
@@ -624,7 +638,7 @@ if __name__=='__main__':
             tnexceed[tnexceed>0] = tmin[tnexceed>0]
 
 
-    # Calcilate daily output
+    # Calculate daily output
     if options.daily: event, ends = identify_hw(EHF)
     if options.tx90pcd:
         event_tx, ends_tx = identify_hw(txexceed)
