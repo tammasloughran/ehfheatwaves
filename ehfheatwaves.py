@@ -7,8 +7,6 @@ temperature data.
 @author: Tammas Loughran
 """
 
-import warnings
-warnings.filterwarnings('ignore')
 import sys
 try:
     modulename = 'pandas'
@@ -22,8 +20,6 @@ try:
     modulename = 'netCDF4'
     import netCDF4 as nc
     from netCDF4 import MFDataset, MFTime, Dataset
-    modulename = 'optparse'
-    from optparse import OptionParser
     modulename = 'distutils.version'
     from distutils.version import LooseVersion
 except ImportError:
@@ -32,6 +28,7 @@ except ImportError:
 if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
     print("Please install numpy version 1.8.0 or higher.")
     sys.exit(2)
+import getoptions
 
 
 class DatesOrderError(Exception):
@@ -230,7 +227,7 @@ def split_hemispheres(EHF):
             EHF_s = EHF_s.reshape(EHF_s.shape[0],space[0]*space[1])
         # Southern hemisphere aspects
         HWA_s, HWM_s, HWN_s, HWF_s, HWD_s, HWT_s = \
-                hw_aspects(EHF_s, season, 'south')
+                hw_aspects(EHF_s, options.season, 'south')
         del EHF_s
     if north:
         if options.maskfile:
@@ -243,7 +240,7 @@ def split_hemispheres(EHF):
             EHF_n = EHF_n.reshape(EHF_n.shape[0],space[0]*space[1])
         # Northern hemisphere aspects
         HWA_n, HWM_n, HWN_n, HWF_n, HWD_n, HWT_n = \
-                hw_aspects(EHF_n, season, 'north')
+                hw_aspects(EHF_n, options.season, 'north')
         del EHF_n
     # Glue hemispheres back together
     if north and south:
@@ -270,103 +267,9 @@ def split_hemispheres(EHF):
     return HWA, HWM, HWN, HWF, HWD, HWT
 
 if __name__=='__main__':
-    # Parse command line arguments
-    usage = "usage: %prog -x <FILE> -n <FILE> -m <FILE> [options]"
-    parser = OptionParser(usage=usage)
-    parser.add_option('-x', '--tmax', dest='tmaxfile',
-                      help='file containing tmax', metavar='FILE')
-    parser.add_option('--vnamex', dest='tmaxvname', default='tasmax',
-                      help='tmax variable name', metavar='STR')
-    parser.add_option('-n', '--tmin', dest='tminfile',
-                      help='file containing tmin', metavar='FILE')
-    parser.add_option('--vnamen', dest='tminvname', default='tasmin',
-                      help='tmin variable name', metavar='STR')
-    parser.add_option('--bpfx', dest='bpfx',
-                      help=('Indicates a future simulation, specifying a tmax file '
-                            'containing the historical base period to be used'),
-                            metavar='FILE')
-    parser.add_option('--bpfn', dest='bpfn',
-                      help=('Indicates a future simulation, specifying a tmin file '
-                      'containing the historical base period to be used'),
-                      metavar='FILE')
-    parser.add_option('-m', '--mask', dest='maskfile',
-                      help='file containing land-sea mask', metavar='FILE')
-    parser.add_option('--vnamem', dest='maskvname', default='sftlf',
-                      help='mask variable name', metavar='STR')
-    parser.add_option('--vnamet', dest='timevname', default='time',
-                      help='time variable name', metavar='STR')
-    parser.add_option('-s', '--season', dest='season', default='summer',
-        help='Season for annual metrics. Defaults to summer',
-        metavar='STR')
-    parser.add_option('-p', dest='pcntl', type='float', default=90,
-        help='the percentile to use for thresholds. Defaults to 90',
-        metavar='INT')
-    parser.add_option('--base', dest='bp', default='1961-1990',
-        help='base period to calculate thresholds. Default 1961-1990',
-        metavar='YYYY-YYYY')
-    parser.add_option('-q', '--qmethod', dest='qtilemethod', default='climpact',
-        help='quantile interpolation method. Default is climpact',
-        metavar='STR')
-    parser.add_option('-d', '--daily', action="store_true", dest='daily',
-        help='output daily EHF values and heatwave indicators')
-    parser.add_option('--dailyonly', action="store_true", dest='dailyonly',
-        help='output only daily EHF values and suppress yearly output')
-    parser.add_option('--t90pc', action="store_true", dest='t90pc',
-        help='Calculate tx90pc and tn90pc heatwaves')
-    parser.add_option('--tx90pc', action="store_true", dest='tx90pc',
-        help='Calculate tx90pc seasonal heatwaves')
-    parser.add_option('--tn90pc', action="store_true", dest='tn90pc',
-        help='Calculate tn90pc seasonal heatwaves')
-    parser.add_option('--tx90pc-daily', action="store_true", dest='tx90pcd',
-        help='Calculate tx90pc daily heatwaves')
-    parser.add_option('--tn90pc-daily', action="store_true", dest='tn90pcd',
-        help='Calculate tn90pc daily heatwaves')
-    parser.add_option('--noehf', action="store_true", dest='noehf',
-        help='Supress EHF output and only use the specified t90pc')
-    parser.add_option('-v', action="store_true", dest='verbose',
-        help='Verbose')
-    parser.add_option('--old-method', action="store_true", dest='oldmethod',
-        help='Use the old definition of within-season heatwaves')
-    (options, args) = parser.parse_args()
-    if not options.tmaxfile or not options.tminfile:
-        print("Please specify tmax and tmin files.")
-        sys.exit(2)
-    if not options.maskfile:
-        print ("You didn't specify a land-sea mask. It's faster if you do, "
-               "so this might take a while.")
-    if len(options.bp)!=9:
-        print("Incorect base period format.")
-        sys.exit(2)
-    else:
-        bpstart = int(options.bp[:4])
-        bpend = int(options.bp[5:9])
-    # Percentile
-    pcntl = options.pcntl
-    # climpact/python/matlab
-    qtilemethod = options.qtilemethod
-    # season (winter/summer)
-    season = options.season
-    if (season!='summer')&(season!='winter'):
-        print("Use either summer or winter.")
-        sys.exit(2)
-    # save daily EHF output
-    yearlyout = True
-    dailyout = False
-    if options.daily or options.tx90pcd or options.tn90pcd: dailyout = True
-    if options.dailyonly:
-        dailyout = True
-        yearlyout = False
-    # Manage yearly output options
-    if options.t90pc:
-        options.tx90pc = True
-        options.tn90pc = True
-    # Flags affecting data managment
-    keeptmax = False
-    if options.tx90pc or options.tx90pcd: keeptmax = True
-    keeptmin = False
-    if options.tn90pc or options.tn90pcd: keeptmin = True
-    keeptave = True
-    if options.noehf: keeptave = False
+
+    # Get the options and variables
+    options = getoptions.parse_arguments(sys.argv[1:])
 
     if options.verbose: print("Loading data")
     # Load time data
@@ -472,9 +375,9 @@ if __name__=='__main__':
     else:
         bpdates = pd.period_range(str(bpdayone), str(bpdaylast))
         if calendar=='365_day': bpdates = bpdates[(bpdates.month!=2)|(bpdates.day!=29)]
-        dates_base = bpdates[(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
-    tmax = tmaxnc.variables[options.tmaxvname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
-    tmin = tminnc.variables[options.tminvname][(bpstart<=bpdates.year)&(bpdates.year<=bpend)]
+        dates_base = bpdates[(options.bpstart<=bpdates.year)&(bpdates.year<=options.bpend)]
+    tmax = tmaxnc.variables[options.tmaxvname][(options.bpstart<=bpdates.year)&(bpdates.year<=options.bpend)]
+    tmin = tminnc.variables[options.tminvname][(options.bpstart<=bpdates.year)&(bpdates.year<=options.bpend)]
     if len(tmin.shape)==4: tmin = tmin.squeeze()
     if len(tmax.shape)==4: tmax = tmax.squeeze()
     # Test for increasing latitude and flip if decreasing
@@ -494,50 +397,50 @@ if __name__=='__main__':
     if tmaxnc.variables[options.tmaxvname].units=='K':
         tmax -= 273.15
         tmin -= 273.15
-    if keeptave: tave_base = (tmax + tmin)/2.
-    if not keeptmin: del tmin
-    if not keeptmax: del tmax
+    if options.keeptave: tave_base = (tmax + tmin)/2.
+    if not options.keeptmin: del tmin
+    if not options.keeptmax: del tmax
 
     # Remove leap days in gregorian calendars
     if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
                 (calendar=='standard'):
-        if keeptave:
+        if options.keeptave:
             tave_base = tave_base[(dates_base.month!=2)|(dates_base.day!=29),...]
-        if keeptmax:
+        if options.keeptmax:
             tmax = tmax[(dates_base.month!=2)|(dates_base.day!=29),...]
-        if keeptmin:
+        if options.keeptmin:
             tmin = tmin[(dates_base.month!=2)|(dates_base.day!=29),...]
         del dates_base
 
     if options.verbose: print("Calculating percentiles")
     # Caclulate 90th percentile
     if not options.noehf: tpct = np.ones(((daysinyear,)+tave_base.shape[1:]))*np.nan
-    if keeptmax: txpct = np.ones(((daysinyear,)+tmax.shape[1:]))*np.nan
-    if keeptmin: tnpct = np.ones(((daysinyear,)+tmin.shape[1:]))*np.nan
+    if options.keeptmax: txpct = np.ones(((daysinyear,)+tmax.shape[1:]))*np.nan
+    if options.keeptmin: tnpct = np.ones(((daysinyear,)+tmin.shape[1:]))*np.nan
     window = np.zeros(daysinyear,dtype=np.bool)
     wsize = 15.
     window[-np.int(np.floor(wsize/2.)):] = 1
     window[:np.int(np.ceil(wsize/2.))] = 1
-    window = np.tile(window,bpend+1-bpstart)
-    if qtilemethod=='python':
+    window = np.tile(window,options.bpend+1-options.bpstart)
+    if options.qtilemethod=='python':
         percentile = np.percentile
         parameter = 0
-    elif qtilemethod=='zhang':
+    elif options.qtilemethod=='zhang':
         percentile = qtiler.quantile_zhang
         parameter = False
-    elif qtilemethod=='matlab':
+    elif options.qtilemethod=='matlab':
         percentile = qtiler.quantile_R
         parameter = 5
-    elif qtilemethod=='climpact':
+    elif options.qtilemethod=='climpact':
         percentile = qtiler.quantile_climpact
         parameter = False
     for day in range(daysinyear):
-        if keeptave:
-            tpct[day,...] = percentile(tave_base[window,...], pcntl, parameter)
-        if keeptmax:
-            txpct[day,...] = percentile(tmax[window,...], pcntl, parameter)
-        if keeptmin:
-            tnpct[day,...] = percentile(tmin[window,...], pcntl, parameter)
+        if options.keeptave:
+            tpct[day,...] = percentile(tave_base[window,...], options.pcntl, parameter)
+        if options.keeptmax:
+            txpct[day,...] = percentile(tmax[window,...], options.pcntl, parameter)
+        if options.keeptmin:
+            tnpct[day,...] = percentile(tmin[window,...], options.pcntl, parameter)
         window = np.roll(window,1)
     if not options.noehf: del tave_base
     del window
@@ -557,6 +460,7 @@ if __name__=='__main__':
     original_shape = tmax.shape
     tmin = tminnc.variables[options.tminvname][:]
     if len(tmin.shape)==4: tmin = tmin.squeeze()
+
     # Test for increasing latitude and flip if decreasing
     try:
         lats = tmaxnc.variables['lat'][:]
@@ -573,41 +477,38 @@ if __name__=='__main__':
         tmin = tmin[:,mask]
     if tmaxnc.variables[options.tmaxvname].units=='K': tmax -= 273.15
     if tminnc.variables[options.tminvname].units=='K': tmin -= 273.15
-    if keeptave: tave = (tmax + tmin)/2.
-    if not keeptmin: del tmin
-    if not keeptmax: del tmax
-
+    if options.keeptave: tave = (tmax + tmin)/2.
+    if not options.keeptmin: del tmin
+    if not options.keeptmax: del tmax
 
     # Remove leap days from tave
     if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
                 (calendar=='standard'):
-        if keeptave:
+        if options.keeptave:
             tave = tave[(dates.month!=2)|(dates.day!=29),...]
             original_shape = (tave.shape[0], original_shape[1], original_shape[2])
-        if keeptmax:
+        if options.keeptmax:
             tmax = tmax[(dates.month!=2)|(dates.day!=29),...]
             original_shape = (tmax.shape[0], original_shape[1], original_shape[2])
-        if keeptmin:
+        if options.keeptmin:
             tmin = tmin[(dates.month!=2)|(dates.day!=29),...]
             original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
         calendar = '365_day'
-
 
     # Remove incomplete starting year
     first_year = dayone.year
     if (dayone.month!=1)|(dayone.day!=1):
         first_year = dayone.year+1
         start = np.argmax(dates.year==first_year)
-        if keeptave:
+        if options.keeptave:
             tave = tave[start:,...]
             original_shape = (tave.shape[0], original_shape[1], original_shape[2])
-        if keeptmax:
+        if options.keeptmax:
             tmax = tmax[start:,...]
             original_shape = (tmax.shape[0], original_shape[1], original_shape[2])
-        if keeptmin:
+        if options.keeptmin:
             tmin = tmin[start:,...]
             original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
-
 
     if options.verbose: print("Caclulating definition")
     # Calculate EHF
@@ -621,22 +522,20 @@ if __name__=='__main__':
             EHF[i,...] = np.maximum(EHIaccl,1.)*EHIsig
         EHF[EHF<0] = 0
 
-
     # Tx90pc exceedences
-    if keeptmin or keeptmax:
-        if keeptmax:
+    if options.keeptmin or options.keeptmax:
+        if options.keeptmax:
             txexceed = np.ones(tmax.shape)*np.nan
             for i in range(0,tmax.shape[0]):
                 idoy = i-daysinyear*int((i+1)/daysinyear)
                 txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
             txexceed[txexceed>0] = tmax[txexceed>0]
-        if keeptmin:
+        if options.keeptmin:
             tnexceed = np.ones(tmin.shape)*np.nan
             for i in range(0,tmin.shape[0]):
                 idoy = i-daysinyear*int((i+1)/daysinyear)
                 tnexceed[i,...] = tmin[i,...]>tnpct[idoy,...]
             tnexceed[tnexceed>0] = tmin[tnexceed>0]
-
 
     # Calculate daily output
     if options.daily: event, ends = identify_hw(EHF)
@@ -648,7 +547,7 @@ if __name__=='__main__':
     nyears = len(range(first_year,daylast.year+1))
 
     # Calculate yearly output
-    if yearlyout:
+    if options.yearlyout:
         if options.verbose: print("Calculating yearly aspects")
         # Split by latitude
         north = (lats>0).any()
@@ -662,7 +561,6 @@ if __name__=='__main__':
         if options.tn90pc:
             HWA_tn, HWM_tn, HWN_tn, HWF_tn, HWD_tn, HWT_tn = \
                     split_hemispheres(tnexceed)
-
 
     if options.verbose: print("Saving")
     # Save to netCDF
@@ -695,10 +593,9 @@ if __name__=='__main__':
 
 
     def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
-        """Save yearly data to netcdf file.
-        """
+        """Save yearly data to netcdf file."""
         yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition,
-            model, experiment, rip, season), 'w')
+            model, experiment, rip, options.season), 'w')
         yearlyout.createDimension('time', size=None)
         yearlyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
         yearlyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
@@ -716,11 +613,11 @@ if __name__=='__main__':
             setattr(yearlyout, "initialization_method", initialization)
             setattr(yearlyout, "physics_version", physics)
         setattr(yearlyout, "period", "%s-%s"%(str(first_year),str(daylast.year)))
-        setattr(yearlyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
-        setattr(yearlyout, "percentile", "%sth"%(str(pcntl)))
+        setattr(yearlyout, "base_period", "%s-%s"%(str(options.bpstart),str(options.bpend)))
+        setattr(yearlyout, "percentile", "%sth"%(str(options.pcntl)))
         setattr(yearlyout, "definition", definition)
         setattr(yearlyout, "frequency", "yearly")
-        setattr(yearlyout, "season", season)
+        setattr(yearlyout, "season", options.season)
         setattr(yearlyout, "season_note", ("The year of a season is the year it starts"
                 " in. SH summer: Nov-Mar. NH summer: May-Sep."))
         try:
@@ -748,12 +645,12 @@ if __name__=='__main__':
         setattr(olon, 'long_name', 'Longitude')
         setattr(olon, 'units', 'degrees_east')
         setattr(olon, 'axis', 'X')
-        otpct = yearlyout.createVariable('t%spct'%(pcntl), 'f8',
+        otpct = yearlyout.createVariable('t%spct'%(options.pcntl), 'f8',
     	    ('day','lat','lon'), fill_value=-999.99)
         setattr(otpct, 'long_name', '90th percentile')
         setattr(otpct, 'units', 'degC')
         setattr(otpct, 'description',
-                '90th percentile of %s-%s'%(str(bpstart),str(bpend)))
+                '90th percentile of %s-%s'%(str(options.bpstart),str(options.bpend)))
         HWAout = yearlyout.createVariable('HWA_%s'%(definition), 'f8',
                 ('time','lat','lon'), fill_value=-999.99)
         setattr(HWAout, 'long_name', 'Heatwave Amplitude')
@@ -835,7 +732,7 @@ if __name__=='__main__':
 
 
     # Save yearly data to netcdf
-    if yearlyout:
+    if options.yearlyout:
         if not options.noehf:
             save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,tpct,"EHF")
         if options.tx90pc:
@@ -845,7 +742,7 @@ if __name__=='__main__':
 
 
     # Save daily data to netcdf
-    if dailyout:
+    if options.dailyout:
         if options.daily or options.dailyonly: defn ='EHF'
         elif options.tx90pcd: defn = 'tx90pct'
         elif options.tn90pcd: defn = 'tn90pct'
@@ -860,8 +757,8 @@ if __name__=='__main__':
         setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
         setattr(dailyout, "script", sys.argv[0])
         setattr(dailyout, "period", "%s-%s"%(str(first_year),str(daylast.year)))
-        setattr(dailyout, "base_period", "%s-%s"%(str(bpstart),str(bpend)))
-        setattr(dailyout, "percentile", "%sth"%(str(pcntl)))
+        setattr(dailyout, "base_period", "%s-%s"%(str(options.bpstart),str(options.bpend)))
+        setattr(dailyout, "percentile", "%sth"%(str(options.pcntl)))
         if model:
             setattr(dailyout, "model_id", model)
             setattr(dailyout, "experiment", experiment)

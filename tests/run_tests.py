@@ -16,6 +16,8 @@ import numpy as np
 import datetime as dt
 import unittest
 from ehfheatwaves import *
+from getoptions import *
+import optparse
 import qtiler
 
 
@@ -222,6 +224,56 @@ class TestIdentifySemiHW(unittest.TestCase):
         self.assertEqual(events.shape, input_shape)
         self.assertEqual(ends.shape, input_shape)
 
+
+class TestGetOptions(unittest.TestCase):
+    """Tests for the getoptins module"""
+
+    args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '--vnamex=tmax' '--vnamen=tmin', '--base=1991-2010', '-v']
+
+    def testConstructsOptions(self):
+        """The parse_arguments function should return an options object"""
+        self.assertIs(type(getoptions.parse_arguments(self.args)), optparse.Values)
+
+    def testNoFilesError(self):
+        """Should return an exception if no data files are provided."""
+        self.assertRaises(NoTmaxTminFileError, getoptions.parse_arguments, ['-v'])
+
+    def testInvalidBP(self):
+        """Should return an exception if the base period is not in the correct format."""
+        args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '--base=19912010']
+        self.assertRaises(InvalidBPFormatError, getoptions.parse_arguments, args)
+
+    def testInvalidSeason(self):
+        """Should return an exception if an invalis season is provided."""
+        args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '--base=1991-2010', '--season=autmn']
+        self.assertRaises(InvalidSeason, getoptions.parse_arguments, args)
+
+    def testBPOrder(self):
+        """Should return an assertion error if the start year of the base period is before the end year"""
+        args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '--base=2010-1960']
+        self.assertRaises(AssertionError, getoptions.parse_arguments, args)
+
+    def testBPAreNums(self):
+        """Should return a ValueError exception if the base period provided are not numbers"""
+        args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '--base=abc-def']
+        self.assertRaises(ValueError, getoptions.parse_arguments, args)
+
+    def testMaskWarning(self):
+        """Should throw a warning if no land-sea mask is provided"""
+        args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '--base=abc-def']
+        self.assertWarns(UserWarning, getoptions.parse_arguments, self.args)
 
 if __name__=='__main__':
     # Test the script as a whole against climpact2 data.
