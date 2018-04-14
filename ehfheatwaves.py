@@ -8,6 +8,8 @@ temperature data.
 """
 
 import sys
+import warnings
+warnings.simplefilter('ignore',category=RuntimeWarning)
 try:
     modulename = 'pandas'
     import pandas as pd
@@ -119,6 +121,10 @@ class calendar360():
             self.year = self.year[:-edoyi]
             self.month = self.month[:-edoyi]
             self.day = self.day[:-edoyi]
+
+    def __getitem__(self,i):
+        """Return a datetime object for the provided index"""
+        return dt.datetime(self.year[i], self.month[i], self.day[i])
 
 
 def hw_aspects(EHF, season, hemisphere):

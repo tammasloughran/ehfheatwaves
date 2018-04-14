@@ -12,6 +12,8 @@ import os
 import netCDF4 as nc
 import sys
 sys.path.append('../')
+import warnings
+warnings.simplefilter('ignore',category=RuntimeWarning)
 import numpy as np
 import datetime as dt
 import unittest
@@ -28,7 +30,7 @@ class TestRQtiler(unittest.TestCase):
 
     def testNegativeP(self):
         """p < 0 should return an exception error."""
-        self.assertRaises(ValueError, qtiler.quantile_R, self.testdata, -1)
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_R, self.testdata, -1)
 
     def testZeroP(self):
         """p = 0 should return the lowest value."""
@@ -36,11 +38,11 @@ class TestRQtiler(unittest.TestCase):
 
     def testHundredP(self):
         """p = 100 should return the largest value."""
-        self.assertEqual(qtiler.quantile_R(self.testdata,100), max(self.testdata))
+        self.assertEqual(qtiler.quantile_R(self.testdata,100,fraction=False), max(self.testdata))
 
     def testHundredPlusP(self):
         """p > 100 should return an exception error."""
-        self.assertRaises(ValueError, qtiler.quantile_R, self.testdata, 101)
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_R, self.testdata, 101)
 
     def testFractionOneP(self):
         """p = 1 as a fraction should return the largest value."""
@@ -48,11 +50,7 @@ class TestRQtiler(unittest.TestCase):
 
     def testPercentAsFraction(self):
         """p (when fraction) > 1 should return an exception Error."""
-        self.assertRaises(ValueError, qtiler.quantile_R, self.testdata, 50, fraction=True)
-
-    def testFractionAsPercent(self):
-        """p (when percent) < 1 should give a warning."""
-        self.assertWarns(Warning, qtiler.quantile_R, self.testdata, 0.5, fraction=False)
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_R, self.testdata, 50, fraction=True)
 
     def testInvalidItype(self):
         self.assertRaises(KeyError, qtiler.quantile_R, self.testdata, 50, itype=0)
@@ -71,7 +69,7 @@ class TestZhangQtiler(unittest.TestCase):
 
     def testNegativeP(self):
         """p < 0 should return an exception error."""
-        self.assertRaises(ValueError, qtiler.quantile_zhang, self.testdata, -1)
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_zhang, self.testdata, -1)
 
     def testZeroP(self):
         """p = 0 should return the lowest value."""
@@ -83,7 +81,7 @@ class TestZhangQtiler(unittest.TestCase):
 
     def testHundredPlusP(self):
         """p > 100 should return an exception error."""
-        self.assertRaises(ValueError, qtiler.quantile_zhang, self.testdata, 101)
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_zhang, self.testdata, 101)
 
     def testFractionOneP(self):
         """p = 1 as a fraction should return the largest value."""
@@ -91,11 +89,7 @@ class TestZhangQtiler(unittest.TestCase):
 
     def testPercentAsFraction(self):
         """p (when fraction) > 1 should return an exception Error."""
-        self.assertRaises(ValueError, qtiler.quantile_zhang, self.testdata, 50, fraction=True)
-
-    def testFractionAsPercent(self):
-        """p (when percent) < 1 should give a warning."""
-        self.assertWarns(Warning, qtiler.quantile_zhang, self.testdata,  0.5, fraction=False)
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_zhang, self.testdata, 50, fraction=True)
 
     def testKnownCase(self):
         """Test a known case for corectness."""
@@ -109,7 +103,7 @@ class TestClimpactQtiler(unittest.TestCase):
 
     def testNegativeP(self):
         """p < 0 should return an exception error."""
-        self.assertRaises(ValueError, qtiler.quantile_climpact, self.testdata, -1)
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_climpact, self.testdata, -1)
 
     def testZeroP(self):
         """p = 0 should return the lowest value."""
@@ -121,7 +115,7 @@ class TestClimpactQtiler(unittest.TestCase):
 
     def testHundredPlusP(self):
         """p > 100 should return an exception error."""
-        self.assertRaises(ValueError, qtiler.quantile_climpact, self.testdata, 101)
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_climpact, self.testdata, 101)
 
     def testFractionOneP(self):
         """p = 1 as a fraction should return the largest value."""
@@ -129,11 +123,7 @@ class TestClimpactQtiler(unittest.TestCase):
 
     def testPercentAsFraction(self):
         """p (when fraction) > 1 should return an exception Error."""
-        self.assertRaises(ValueError, qtiler.quantile_climpact, self.testdata, 50, fraction=True)
-
-    def testFractionAsPercent(self):
-        """p (when percent) < 1 should give a warning."""
-        self.assertRaises(Warning, qtiler.quantile_climpact, self.testdata, 0.5, fraction=False)
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_climpact, self.testdata, 50, fraction=True)
 
     def testKnownCase(self):
         """Test a known case for corectness."""
@@ -168,7 +158,7 @@ class TestIdentifyHW(unittest.TestCase):
     ehfdata = np.array([-1.3, -0.3, 3.4, 8.5, -0.4, # Not a heatwave
                         5.6, 10.2, 20.4, -1.4, # a three day heatwave starting on day 6
                         7.8, 15.5, 16.9, 17.9, 30.2, -3.3]) # a 5 day heatwave starting on day 10
-
+    ehfdata[ehfdata<0] = 0
     known_events = np.array([0,0,0,0,0,1,1,1,0,1,1,1,1,1,0])
     known_ends = np.array([0,0,0,0,0,3,0,0,0,5,0,0,0,0,0])
 
@@ -200,9 +190,9 @@ class TestIdentifySemiHW(unittest.TestCase):
     ehfdata = np.array([1.3, 0.3, -3.4, 8.5, -0.4, # 2 day heatwave
                         5.6, 10.2, 20.4, -1.4, # a three day heatwave starting on day 6
                         7.8, 15.5, 16.9, 17.9, 30.2, -3.3]) # a 5 day heatwave starting on day 10
-
-    known_events = np.array([1,1,0,0,0,1,1,1,0,1,1,1,1,1,0])
-    known_ends = np.array([2,0,0,0,0,3,0,0,0,5,0,0,0,0,0])
+    ehfdata[ehfdata<0] = 0
+    known_events = np.array([0,0,0,0,0,1,1,1,0,1,1,1,1,1,0])
+    known_ends = np.array([0,0,0,0,0,3,0,0,0,5,0,0,0,0,0])
 
     def testReturnTupple(self):
         """Should return a tupple containging the event indicator and the durations (numpy.ndarrays)."""
@@ -252,7 +242,7 @@ class TestGetOptions(unittest.TestCase):
         args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
             '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
             '--base=1991-2010', '--season=autmn']
-        self.assertRaises(InvalidSeason, getoptions.parse_arguments, args)
+        self.assertRaises(InvalidSeasonError, getoptions.parse_arguments, args)
 
     def testBPOrder(self):
         """Should return an assertion error if the start year of the base period is before the end year"""

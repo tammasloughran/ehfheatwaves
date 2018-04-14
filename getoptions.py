@@ -30,13 +30,14 @@ class InvalidBPFormatError(Exception):
         print("The provided base period (", baseperiod, ")  must be formatted ????-????)")
 
 
-class InvalidSeason(Exception):
+class InvalidSeasonError(Exception):
     """Exception to be raised when the  given season is not summer or winter."""
     def __init__(self, season):
         print("The provided season much be either winter or summer. You specified ", season)
 
 
 def parse_arguments(arguments):
+    """parse_arguments parses the arguments to an options object, and handles some errors."""
     # Construct the options for the parser
     parser = OptionParser(usage="usage: %prog -x <FILE> -n <FILE> -m <FILE> [options]")
     parser.add_option('-x', '--tmax', dest='tmaxfile', help='file containing tmax', metavar='FILE')
@@ -75,7 +76,7 @@ def parse_arguments(arguments):
     except ValueError:
         print('Base period years are not numbers.')
     assert int(options.bp[:4])<int(options.bp[5:9]), "Base period start is after end year."
-    if (options.season!='summer')&(options.season!='winter'): raise InvalidSeason(options.season)
+    if (options.season!='summer')&(options.season!='winter'): raise InvalidSeasonError(options.season)
     warnmsg = "You didn't specify a land-sea mask. It's faster if you do, so this might take a while."
     if not options.maskfile: warnings.warn(warnmsg, UserWarning)
 

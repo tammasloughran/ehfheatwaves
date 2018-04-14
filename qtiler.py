@@ -8,6 +8,12 @@ interpolation methods.
 """
 
 
+class InvalidPercentileError(Exception):
+    """Exception to be raised if the provided percentile is invalid."""
+    def __init__(self, p):
+        print(p, " is not a valid fraction value.")
+
+
 def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
     """quantile function used in R
 
@@ -29,9 +35,11 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
     q -- quantile at pth percentile
     """
     import numpy as np
+
     # Convert the percentile to a fraction
     if not fraction:
         p = p/100.
+    if (p>1) or (p<0): raise InvalidPercentileError(p)
     # Flatten the array
     x = x.flatten()
     # remove nans if desired
@@ -39,6 +47,7 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
         x = x[np.logical_not(np.isnan(x))]
     elif (np.isnan(np.min(x)))&(rmnans==False):
         raise Exception('You must not have nans in percentile calculation')
+    if (p==1): return max(x)
     # Get number of samples
     n = len(x)
     # Sort
@@ -139,6 +148,7 @@ def quantile_zhang(y, p, fraction=False, rmnans=False):
     # Convert the percentile to a fraction
     if not fraction:
         p = p/100.
+    if (p>1) or (p<0): raise InvalidPercentileError(p)
     # Flatten array
     #y = y.flatten()
     if (np.isnan(np.min(y)))&(rmnans==True):
@@ -187,6 +197,7 @@ def quantile_climpact(y,p,fraction=False):
     import sys
     if not fraction:
         p = p/100.
+    if (p>1) or (p<0): raise InvalidPercentileError(p)
     n = y.shape[0]
     a, b = 1.0/3.0, 1.0/3.0
     nppm = a + p*(n + 1 - a - b) - 1
