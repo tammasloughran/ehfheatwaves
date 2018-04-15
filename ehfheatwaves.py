@@ -13,12 +13,6 @@ warnings.simplefilter('ignore',category=RuntimeWarning)
 try:
     modulename = 'numpy'
     import numpy as np
-    modulename = 'datetime'
-    import datetime as dt
-    modulename = 'qtiler'
-    import qtiler
-    modulename = 'netCDF4'
-    from netCDF4 import MFDataset, Dataset
     modulename = 'distutils.version'
     from distutils.version import LooseVersion
 except ImportError:
@@ -27,8 +21,42 @@ except ImportError:
 if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
     print("Please install numpy version 1.8.0 or higher.")
     sys.exit(2)
+import qtiler
 import getoptions
 import ncio
+
+
+def window_percentile(temp, options, daysinyear=365, wsize=15):
+    """window_percentile calculates a day-of-year moving window percentile."""
+    # Initialise array.
+    pctl = np.ones(((daysinyear,)+tmax.shape[1:]))*np.nan
+
+    # Construct the window.
+    window = np.zeros(daysinyear,dtype=np.bool)
+    window[-np.int(np.floor(wsize/2.)):] = 1
+    window[:np.int(np.ceil(wsize/2.))] = 1
+    window = np.tile(window,options.bpend+1-options.bpstart)
+
+    # Select the interpolation method.
+    if options.qtilemethod=='python':
+        percentile = np.percentile
+        parameter = 0
+    elif options.qtilemethod=='zhang':
+        percentile = qtiler.quantile_zhang
+        parameter = False
+    elif options.qtilemethod=='matlab':
+        percentile = qtiler.quantile_R
+        parameter = 5
+    elif options.qtilemethod=='climpact':
+        percentile = qtiler.quantile_climpact
+        parameter = False
+
+    # Set the percentile for each day of year.
+    for day in range(daysinyear):
+        pctl[day,...] = percentile(temp[window,...], options.pcntl, parameter)
+        window = np.roll(window,1)
+
+    return pctl
 
 
 def identify_hw(ehfs):
@@ -255,84 +283,36 @@ if __name__=='__main__':
     if options.keeptave:
         tave_base = (tmax + tmin)/2.
 
-    # Caclulate 90th percentile
+    # Caclulate percentile
     if options.verbose: print("Calculating percentiles")
-    if not options.noehf: tpct = np.ones(((timedata.daysinyear,)+tave_base.shape[1:]))*np.nan
-    if options.keeptmax: txpct = np.ones(((timedata.daysinyear,)+tmax.shape[1:]))*np.nan
-    if options.keeptmin: tnpct = np.ones(((timedata.daysinyear,)+tmin.shape[1:]))*np.nan
-    window = np.zeros(timedata.daysinyear,dtype=np.bool)
-    wsize = 15.
-    window[-np.int(np.floor(wsize/2.)):] = 1
-    window[:np.int(np.ceil(wsize/2.))] = 1
-    window = np.tile(window,options.bpend+1-options.bpstart)
-    if options.qtilemethod=='python':
-        percentile = np.percentile
-        parameter = 0
-    elif options.qtilemethod=='zhang':
-        percentile = qtiler.quantile_zhang
-        parameter = False
-    elif options.qtilemethod=='matlab':
-        percentile = qtiler.quantile_R
-        parameter = 5
-    elif options.qtilemethod=='climpact':
-        percentile = qtiler.quantile_climpact
-        parameter = False
-    for day in range(timedata.daysinyear):
-        if options.keeptave:
-            tpct[day,...] = percentile(tave_base[window,...], options.pcntl, parameter)
-        if options.keeptmax:
-            txpct[day,...] = percentile(tmax[window,...], options.pcntl, parameter)
-        if options.keeptmin:
-            tnpct[day,...] = percentile(tmin[window,...], options.pcntl, parameter)
-        window = np.roll(window,1)
+    if options.keeptave:
+        tpct = window_percentile(tave_base, options, daysinyear=timedata.daysinyear)
+    if options.keeptmax:
+        txpct = window_percentile(tmax, options, daysinyear=timedata.daysinyear)
+    if options.keeptmin:
+        tnpct = window_percentile(tmin, options, daysinyear=timedata.daysinyear)
     if not options.noehf: del tave_base
-    del window
 
-    if options.verbose:print("Loading data")
     # Load all data
-    try:
-        tminnc = MFDataset(options.tminfile, 'r')
-    except IndexError:
-        tminnc = Dataset(options.tminfile, 'r')
-    try:
-        tmaxnc = MFDataset(options.tmaxfile, 'r')
-    except IndexError:
-        tmaxnc = Dataset(options.tmaxfile, 'r')
-    tmax = tmaxnc.variables[options.tmaxvname][:]
-    if len(tmax.shape)==4: tmax = tmax.squeeze()
-    original_shape = tmax.shape
-    tmin = tminnc.variables[options.tminvname][:]
-    if len(tmin.shape)==4: tmin = tmin.squeeze()
-
-    # Test for increasing latitude and flip if decreasing
-    try:
-        lats = tmaxnc.variables['lat'][:]
-    except KeyError:
-        lats = tmaxnc.variables['latitude'][:]
-    increasing = (lats[0]-lats[-1])<0
-    if not increasing:
-        lats = np.flipud(lats)
-        tmax = np.fliplr(tmax)
-        tmin = np.fliplr(tmin)
-    if options.maskfile:
-    #    if not increasing: mask = np.flipud(mask)
-        tmax = tmax[:,mask]
-        tmin = tmin[:,mask]
-    if tmaxnc.variables[options.tmaxvname].units=='K': tmax -= 273.15
-    if tminnc.variables[options.tminvname].units=='K': tmin -= 273.15
-    if options.keeptave: tave = (tmax + tmin)/2.
-    if not options.keeptmin: del tmin
-    if not options.keeptmax: del tmax
+    if options.verbose:print("Loading data")
+    if options.keeptave or options.keeptmax:
+        tmax, lats = ncio.get_all_data(options.tmaxfile, options.tmaxvname, options)
+        original_shape = tmax.shape
+    if options.keeptave or options.keeptmin:
+        tmin, _ = ncio.get_all_data(options.tminfile, options.tminvname, options)
+        original_shape = tmin.shape
+    if options.keeptave:
+        tave = (tmax + tmin)/2.
 
     # Remove leap days from tave
     if (timedata.calendar=='gregorian')|(timedata.calendar=='proleptic_gregorian')|(timedata.calendar=='standard'):
         if options.keeptave:
             tave = tave[(timedata.dates.month!=2)|(timedata.dates.day!=29),...]
             original_shape = (tave.shape[0], original_shape[1], original_shape[2])
-        if options.keeptmax:
+        if options.keeptmax or options.keeptave:
             tmax = tmax[(timedata.dates.month!=2)|(timedata.dates.day!=29),...]
             original_shape = (tmax.shape[0], original_shape[1], original_shape[2])
-        if options.keeptmin:
+        if options.keeptmin or options.keeptave:
             tmin = tmin[(timedata.dates.month!=2)|(timedata.dates.day!=29),...]
             original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
         calendar = '365_day'
@@ -405,182 +385,14 @@ if __name__=='__main__':
                     split_hemispheres(tnexceed)
 
     if options.verbose: print("Saving")
-    # Save to netCDF
-    # Retrieve metadata from file
-    try:
-        experiment = tmaxnc.__getattribute__('experiment')
-        model = tmaxnc.__getattribute__('model_id')
-        parent = tmaxnc.__getattribute__('parent_experiment_rip')
-        realization = tmaxnc.__getattribute__('realization')
-        initialization = tmaxnc.__getattribute__('initialization_method')
-        physics = tmaxnc.__getattribute__('physics_version')
-        rip = 'r'+str(realization)+'i'+str(initialization)+'p'+str(physics)
-    except AttributeError:
-        experiment = ''
-        model = ''
-        realization = ''
-        rip = ''
-        initialization = ''
-        physics = ''
-    try:
-        space = (tmaxnc.dimensions['lat'].__len__(),
-                tmaxnc.dimensions['lon'].__len__())
-        lonname = 'lon'
-        latname = 'lat'
-    except KeyError:
-        lonname = 'longitude'
-        latname = 'latitude'
-        space = (tmaxnc.dimensions['latitude'].__len__(),
-                tmaxnc.dimensions['longitude'].__len__())
-
-
-    def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition):
-        """Save yearly data to netcdf file."""
-        yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition,
-            model, experiment, rip, options.season), 'w')
-        yearlyout.createDimension('time', size=None)
-        yearlyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
-        yearlyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
-        yearlyout.createDimension('day', timedata.daysinyear)
-        setattr(yearlyout, "author", "Tammas Loughran")
-        setattr(yearlyout, "contact", "t.loughran@student.unsw.edu.au")
-        setattr(yearlyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
-        setattr(yearlyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
-        setattr(yearlyout, "script", sys.argv[0])
-        if model:
-            setattr(yearlyout, "model_id", model)
-            setattr(yearlyout, "experiment", experiment)
-            setattr(yearlyout, "parent_experiment_rip", parent)
-            setattr(yearlyout, "realization", realization)
-            setattr(yearlyout, "initialization_method", initialization)
-            setattr(yearlyout, "physics_version", physics)
-        setattr(yearlyout, "period", "%s-%s"%(str(first_year),str(timedata.daylast.year)))
-        setattr(yearlyout, "base_period", "%s-%s"%(str(options.bpstart),str(options.bpend)))
-        setattr(yearlyout, "percentile", "%sth"%(str(options.pcntl)))
-        setattr(yearlyout, "definition", definition)
-        setattr(yearlyout, "frequency", "yearly")
-        setattr(yearlyout, "season", options.season)
-        setattr(yearlyout, "season_note", ("The year of a season is the year it starts"
-                " in. SH summer: Nov-Mar. NH summer: May-Sep."))
-        try:
-            file = open('version', 'r')
-            commit = file.read()[:]
-            if commit[-2:]==r'\n': commit = commit[:-2]
-        except IOError:
-            commit = "Unknown. Check date for latest version."
-        setattr(yearlyout, "git_commit", commit)
-        setattr(yearlyout, "tmax_file", options.tmaxfile)
-        setattr(yearlyout, "tmin_file", options.tminfile)
-        if options.maskfile:
-            setattr(yearlyout, "mask_file", options.maskfile)
-        setattr(yearlyout, "quantile_method", options.qtilemethod)
-        otime = yearlyout.createVariable('time', 'f8', 'time',
-                fill_value=-999.99)
-        setattr(otime, 'units', 'year')
-        olat = yearlyout.createVariable('lat', 'f8', 'lat')
-        setattr(olat, 'standard_name', 'latitude')
-        setattr(olat, 'long_name', 'Latitude')
-        setattr(olat, 'units', 'degrees_north')
-        setattr(olat, 'axis', 'Y')
-        olon = yearlyout.createVariable('lon', 'f8', 'lon')
-        setattr(olon, 'standard_name', 'longiitude')
-        setattr(olon, 'long_name', 'Longitude')
-        setattr(olon, 'units', 'degrees_east')
-        setattr(olon, 'axis', 'X')
-        otpct = yearlyout.createVariable('t%spct'%(options.pcntl), 'f8',
-    	    ('day','lat','lon'), fill_value=-999.99)
-        setattr(otpct, 'long_name', '90th percentile')
-        setattr(otpct, 'units', 'degC')
-        setattr(otpct, 'description',
-                '90th percentile of %s-%s'%(str(options.bpstart),str(options.bpend)))
-        HWAout = yearlyout.createVariable('HWA_%s'%(definition), 'f8',
-                ('time','lat','lon'), fill_value=-999.99)
-        setattr(HWAout, 'long_name', 'Heatwave Amplitude')
-        if definition=='tx90pct':
-            setattr(HWAout, 'units', 'degC')
-        elif definition=='tn90pct':
-            setattr(HWAout, 'units', 'degC')
-        elif definition=='EHF':
-            setattr(HWAout, 'units', 'degC2')
-        setattr(HWAout, 'description',
-                'Peak of the hottest heatwave per year')
-        HWMout = yearlyout.createVariable('HWM_%s'%(definition), 'f8',
-                ('time','lat','lon'), fill_value=-999.99)
-        setattr(HWMout, 'long_name', 'Heatwave Magnitude')
-        if definition=='tx90pct':
-            setattr(HWAout, 'units', 'degC')
-        elif definition=='tn90pct':
-            setattr(HWAout, 'units', 'degC')
-        elif definition=='EHF':
-            setattr(HWAout, 'units', 'degC2')
-        setattr(HWMout, 'description', 'Average magnitude of the yearly heatwave')
-        HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8',
-                ('time', 'lat', 'lon'), fill_value=-999.99)
-        setattr(HWNout, 'long_name', 'Heatwave Number')
-        setattr(HWNout, 'units','heatwaves')
-        setattr(HWNout, 'description', 'Number of heatwaves per year')
-        HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8',
-                ('time','lat','lon'), fill_value=-999.99)
-        setattr(HWFout, 'long_name','Heatwave Frequency')
-        setattr(HWFout, 'units', 'days')
-        setattr(HWFout, 'description', 'Proportion of heatwave days per season')
-        HWDout = yearlyout.createVariable('HWD_%s'%(definition), 'f8',
-                ('time','lat','lon'), fill_value=-999.99)
-        setattr(HWDout, 'long_name', 'Heatwave Duration')
-        setattr(HWDout, 'units', 'days')
-        setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
-        HWTout = yearlyout.createVariable('HWT_%s'%(definition), 'f8',
-                ('time','lat','lon'), fill_value=-999.99)
-        setattr(HWTout, 'long_name', 'Heatwave Timing')
-        setattr(HWTout, 'units', 'days from strat of season')
-        setattr(HWTout, 'description', 'First heat wave day of the season')
-        otime[:] = range(first_year, timedata.daylast.year+1)
-        olat[:] = lats
-        lons = tmaxnc.variables[lonname][:]
-        olon[:] = lons
-        dummy_array = np.ones((timedata.daysinyear,)+(len(lats),)+(len(lons),))*np.nan
-        if options.maskfile:
-            dummy_array[:,mask] = tpct
-            dummy_array[np.isnan(dummy_array)] = -999.99
-            otpct[:] = dummy_array.copy()
-            dummy_array = np.ones((nyears,)+(len(lats),)+(len(lons),))*np.nan
-            dummy_array[:,mask] = HWA
-            dummy_array[np.isnan(dummy_array)] = -999.99
-            HWAout[:] = dummy_array.copy()
-            dummy_array[:,mask] = HWM
-            dummy_array[np.isnan(dummy_array)] = -999.99
-            HWMout[:] = dummy_array.copy()
-            dummy_array[:,mask] = HWN
-            dummy_array[np.isnan(dummy_array)] = -999.99
-            HWNout[:] = dummy_array.copy()
-            dummy_array[:,mask] = HWF
-            dummy_array[np.isnan(dummy_array)] = -999.99
-            HWFout[:] = dummy_array.copy()
-            dummy_array[:,mask] = HWD
-            dummy_array[np.isnan(dummy_array)] = -999.99
-            HWDout[:] = dummy_array.copy()
-            dummy_array[:,mask] = HWT
-            dummy_array[np.isnan(dummy_array)] = -999.99
-            HWTout[:] = dummy_array.copy()
-        else:
-            otpct[:] = tpct
-            HWAout[:] = HWA.reshape((nyears,)+space)
-            HWMout[:] = HWM.reshape((nyears,)+space)
-            HWNout[:] = HWN.reshape((nyears,)+space)
-            HWFout[:] = HWF.reshape((nyears,)+space)
-            HWDout[:] = HWD.reshape((nyears,)+space)
-            HWTout[:] = HWT.reshape((nyears,)+space)
-        yearlyout.close()
-
-
     # Save yearly data to netcdf
     if options.yearlyout:
         if not options.noehf:
-            save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,tpct,"EHF")
+            ncio.save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,tpct,"EHF",timedata,options,mask)
         if options.tx90pc:
-            save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,txpct,"tx90pct")
+            ncio.save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,txpct,"tx90pct",timedata,options,mask)
         if options.tn90pc:
-            save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,tnpct,"tn90pct")
+            ncio.save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,tnpct,"tn90pct",timedata,options,mask)
 
 
     # Save daily data to netcdf
