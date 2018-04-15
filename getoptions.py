@@ -1,4 +1,4 @@
-#!/usr/bin python3
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
 getoptions.py parses the command line arguments to an options object.
@@ -39,7 +39,7 @@ class InvalidSeasonError(Exception):
 def parse_arguments(arguments):
     """parse_arguments parses the arguments to an options object, and handles some errors."""
     # Construct the options for the parser
-    parser = OptionParser(usage="usage: %prog -x <FILE> -n <FILE> -m <FILE> [options]")
+    parser = OptionParser(usage="usage: %prog -x <FILE> -n <FILE> [options]")
     parser.add_option('-x', '--tmax', dest='tmaxfile', help='file containing tmax', metavar='FILE')
     parser.add_option('--vnamex', dest='tmaxvname', default='tasmax', help='tmax variable name', metavar='STR')
     parser.add_option('-n', '--tmin', dest='tminfile', help='file containing tmin', metavar='FILE')

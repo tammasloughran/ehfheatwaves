@@ -1,4 +1,4 @@
-#!/usr/bin python3
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
 run_tests.py tests the accuracy of ehfheatwaves.py compared to heatwave data

@@ -1,4 +1,4 @@
-#!/usr/bin/ python3
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
 ehfheatwaves.py calculates heatwave indices and characteristics from
@@ -304,9 +304,6 @@ if __name__=='__main__':
         daylast = nc.num2date(nctime[-1], nctime.units,
                 calendar=calendar)
         dates = calendar360(dayone, daylast)
-        shorten = 0
-        if (daylast.day!=30)|(daylast.month!=12):
-            shorten = 30*(13-daylast.month) - daylast.day
     else:
         daysinyear = 365
         # 365 day season start and end indices
@@ -324,11 +321,6 @@ if __name__=='__main__':
                     calendar=calendar)
         dates = pd.period_range(str(dayone), str(daylast))
         if calendar=='365_day': dates = dates[(dates.month!=2)|(dates.day!=29)]
-        shorten = 0
-        if (daylast.day!=30)|(daylast.month!=12):
-            endofdata = dt.datetime(2000, daylast.month, daylast.day)
-            shorten = dt.datetime(2000, 12, 31) - endofdata
-            shorten = shorten.days
 
     # Load land-sea mask
     if options.maskfile:
