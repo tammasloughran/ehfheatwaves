@@ -11,8 +11,6 @@ import sys
 import warnings
 warnings.simplefilter('ignore',category=RuntimeWarning)
 try:
-    modulename = 'pandas'
-    import pandas as pd
     modulename = 'numpy'
     import numpy as np
     modulename = 'datetime'
@@ -20,8 +18,7 @@ try:
     modulename = 'qtiler'
     import qtiler
     modulename = 'netCDF4'
-    import netCDF4 as nc
-    from netCDF4 import MFDataset, MFTime, Dataset
+    from netCDF4 import MFDataset, Dataset
     modulename = 'distutils.version'
     from distutils.version import LooseVersion
 except ImportError:
@@ -31,17 +28,7 @@ if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
     print("Please install numpy version 1.8.0 or higher.")
     sys.exit(2)
 import getoptions
-
-
-class DatesOrderError(Exception):
-    """Exception to be raised when the calendar start day occurs before the end day"""
-
-    def __init__(self, start, end):
-        self.start = start
-        self.end = end
-        print("Calendar end date appears before the start date")
-        print("start: ", self.start)
-        print("end: ", self.end)
+import ncio
 
 
 def identify_hw(ehfs):
@@ -102,31 +89,6 @@ def identify_semi_hw(ehfs):
     return events, endss
 
 
-class calendar360():
-    """Creates a calendar object with 360 days per year."""
-
-    def __init__(self,sdate,edate):
-        if sdate>edate: raise DatesOrderError(sdate,edate)
-        self.year = np.repeat(range(sdate.year,edate.year+1), 360, 0)
-        nyears = len(range(sdate.year,edate.year+1))
-        self.month = np.tile(np.repeat(range(1,12+1), 30, 0), nyears)
-        self.day = np.tile(np.tile(range(1,30+1), 12), nyears)
-        if (sdate.day!=1)|(edate.month!=1):
-            sdoyi = (sdate.month-1)*30+sdate.day-1
-            self.year = self.year[sdoyi:]
-            self.month = self.month[sdoyi:]
-            self.day = self.day[sdoyi:]
-        if (edate.day!=30)|(edate.month!=12):
-            edoyi = (12-edate.month)*30+(30-edate.day)
-            self.year = self.year[:-edoyi]
-            self.month = self.month[:-edoyi]
-            self.day = self.day[:-edoyi]
-
-    def __getitem__(self,i):
-        """Return a datetime object for the provided index"""
-        return dt.datetime(self.year[i], self.month[i], self.day[i])
-
-
 def hw_aspects(EHF, season, hemisphere):
     """hw_aspects takes EHF values or temp 90pct exceedences identifies
     heatwaves and calculates seasonal aspects.
@@ -134,18 +96,18 @@ def hw_aspects(EHF, season, hemisphere):
     # Select indices depending on calendar season and hemisphere
     if season=='summer':
         if hemisphere=='south':
-            startday = SHS[0]
-            endday = SHS[1]
+            startday = timedata.SHS[0]
+            endday = timedata.SHS[1]
         else:
-            startday = SHW[0]
-            endday = SHW[1]
+            startday = timedata.SHW[0]
+            endday = timedata.SHW[1]
     elif season=='winter':
         if hemisphere=='south':
-            startday = SHW[0]
-            endday = SHW[1]
+            startday = timedata.SHW[0]
+            endday = timedata.SHW[1]
         else:
-            startday = SHS[0]
-            endday = SHS[1]
+            startday = timedata.SHS[0]
+            endday = timedata.SHS[1]
     # Initialize arrays
     HWA = np.ones(((nyears,)+(EHF.shape[1],)))*np.nan
     HWM = HWA.copy()
@@ -154,13 +116,13 @@ def hw_aspects(EHF, season, hemisphere):
     HWD = HWA.copy()
     HWT = HWA.copy()
     # Loop over years
-    for iyear, year in enumerate(range(first_year,daylast.year)):
+    for iyear, year in enumerate(range(first_year,timedata.daylast.year)):
         if options.oldmethod:
-            if (year==daylast.year): continue # Incomplete yr
+            if (year==timedata.daylast.year): continue # Incomplete yr
             # Select this years season
             allowance = 14 # For including heawave days after the end of the season
-            ifrom = startday + daysinyear*iyear - 1 # -1 to include Oct 31st
-            ito = endday + daysinyear*iyear + allowance
+            ifrom = timedata.startday + timedata.daysinyear*iyear - 1 # -1 to include Oct 31st
+            ito = endday + timedata.daysinyear*iyear + allowance
             EHF_i = EHF[ifrom:ito,...]
             event_i, duration_i = identify_hw(EHF_i)
             # Identify heatwaves that span the entire season
@@ -175,8 +137,8 @@ def hw_aspects(EHF, season, hemisphere):
         else:
             # Select this years season
             allowance = 14 # For including heawave days after the end of the season
-            ifrom = startday + daysinyear*iyear - 2
-            ito = endday + daysinyear*iyear + allowance
+            ifrom = startday + timedata.daysinyear*iyear - 2
+            ito = endday + timedata.daysinyear*iyear + allowance
             EHF_i = EHF[ifrom:ito,...]
             event_i, duration_i = identify_hw(EHF_i)
             # Remove EHF values in pre season
@@ -277,145 +239,28 @@ if __name__=='__main__':
     # Get the options and variables
     options = getoptions.parse_arguments(sys.argv[1:])
 
-    if options.verbose: print("Loading data")
     # Load time data
-    try:
-        tmaxnc = MFDataset(options.tmaxfile, 'r')
-    except IndexError:
-        tmaxnc = Dataset(options.tmaxfile, 'r')
-    nctime = tmaxnc.variables[options.timevname]
-    try:
-        nctime = MFTime(nctime)
-    except AttributeError:
-        pass
-    except ValueError:
-        pass
-    calendar = nctime.calendar
-    if not calendar:
-        print('Unrecognized calendar. Using gregorian.')
-        calendar = 'gregorian'
-    elif calendar=='360_day':
-        daysinyear = 360
-        # 360 day season start and end indices
-        SHS = (300,450)
-        SHW = (120,270)
-        dayone = nc.num2date(nctime[0], nctime.units,
-                calendar=calendar)
-        daylast = nc.num2date(nctime[-1], nctime.units,
-                calendar=calendar)
-        dates = calendar360(dayone, daylast)
-    else:
-        daysinyear = 365
-        # 365 day season start and end indices
-        SHS = (304,455)
-        SHW = (120,273)
-        if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
-            st = str(int(nctime[0]))
-            nd = str(int(nctime[-1]))
-            dayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
-            daylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(nd[6:]))
-        else:
-            dayone = nc.num2date(nctime[0], nctime.units,
-                    calendar=calendar)
-            daylast = nc.num2date(nctime[-1], nctime.units,
-                    calendar=calendar)
-        dates = pd.period_range(str(dayone), str(daylast))
-        if calendar=='365_day': dates = dates[(dates.month!=2)|(dates.day!=29)]
+    if options.verbose: print("Loading data")
+    timedata = ncio.get_time_data(options)
 
     # Load land-sea mask
-    if options.maskfile:
-        masknc = Dataset(options.maskfile, 'r')
-        vname = options.maskvname
-        mask = masknc.variables[vname][:]
-        if mask.max()>1: mask = mask>50
-        mask = mask.astype(np.bool)
-        mask = np.squeeze(mask)
-        masknc.close()
+    if options.maskfile: mask = ncio.get_mask(options)
+    else: mask = None
 
-    # Load base period data
-    if options.bpfn:
-        try:
-            tminnc = MFDataset(options.bpfn, 'r')
-        except IndexError:
-            tminnc = Dataset(options.bpfn, 'r')
-    else:
-        try:
-            tminnc = MFDataset(options.tminfile, 'r')
-        except IndexError:
-            tminnc = Dataset(options.tminfile, 'r')
-    if options.bpfx:
-        try:
-            tmaxnc = MFDataset(options.bpfx, 'r')
-        except IndexError:
-            tmaxnc = Dataset(options.bpfx, 'r')
-    else:
-        try:
-            tmaxnc = MFDataset(options.tmaxfile, 'r')
-        except IndexError:
-            tmaxnc = Dataset(options.tmaxfile, 'r')
-    vname = options.tmaxvname
-    bptime = tmaxnc.variables[options.timevname]
-    try:
-        bptime = MFTime(bptime)
-    except AttributeError:
-        pass
-    except ValueError:
-        pass
-    if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
-        st = str(int(bptime[0]))
-        nd = str(int(bptime[-1]))
-        bpdayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
-        bpdaylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(nd[6:]))
-    else:
-        bpdayone = nc.num2date(bptime[0], bptime.units, calendar=calendar)
-        bpdaylast = nc.num2date(bptime[-1], bptime.units, calendar=calendar)
-    if calendar=='360_day': bpdates = calendar360(bpdayone, bpdaylast)
-    else:
-        bpdates = pd.period_range(str(bpdayone), str(bpdaylast))
-        if calendar=='365_day': bpdates = bpdates[(bpdates.month!=2)|(bpdates.day!=29)]
-        dates_base = bpdates[(options.bpstart<=bpdates.year)&(bpdates.year<=options.bpend)]
-    tmax = tmaxnc.variables[options.tmaxvname][(options.bpstart<=bpdates.year)&(bpdates.year<=options.bpend)]
-    tmin = tminnc.variables[options.tminvname][(options.bpstart<=bpdates.year)&(bpdates.year<=options.bpend)]
-    if len(tmin.shape)==4: tmin = tmin.squeeze()
-    if len(tmax.shape)==4: tmax = tmax.squeeze()
-    # Test for increasing latitude and flip if decreasing
-    try:
-        lats = tmaxnc.variables['lat'][:]
-    except KeyError:
-        lats = tmaxnc.variables['latitude'][:]
-    increasing = (lats[0]-lats[-1])<0
-    if not increasing:
-        lats = np.flipud(lats)
-        tmax = np.fliplr(tmax)
-        tmin = np.fliplr(tmin)
-    if options.maskfile:
-        if not increasing: mask = np.flipud(mask)
-        tmin = tmin[:,mask]
-        tmax = tmax[:,mask]
-    if tmaxnc.variables[options.tmaxvname].units=='K':
-        tmax -= 273.15
-        tmin -= 273.15
-    if options.keeptave: tave_base = (tmax + tmin)/2.
-    if not options.keeptmin: del tmin
-    if not options.keeptmax: del tmax
+    # Load the temperature data over the base period
+    if options.keeptave or options.keeptmax:
+        tmax = ncio.load_bp_data(options, timedata, variable='tmax', mask=mask)
+    if options.keeptave or options.keeptmin:
+        tmin = ncio.load_bp_data(options, timedata, variable='tmin', mask=mask)
+    if options.keeptave:
+        tave_base = (tmax + tmin)/2.
 
-    # Remove leap days in gregorian calendars
-    if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
-                (calendar=='standard'):
-        if options.keeptave:
-            tave_base = tave_base[(dates_base.month!=2)|(dates_base.day!=29),...]
-        if options.keeptmax:
-            tmax = tmax[(dates_base.month!=2)|(dates_base.day!=29),...]
-        if options.keeptmin:
-            tmin = tmin[(dates_base.month!=2)|(dates_base.day!=29),...]
-        del dates_base
-
-    if options.verbose: print("Calculating percentiles")
     # Caclulate 90th percentile
-    if not options.noehf: tpct = np.ones(((daysinyear,)+tave_base.shape[1:]))*np.nan
-    if options.keeptmax: txpct = np.ones(((daysinyear,)+tmax.shape[1:]))*np.nan
-    if options.keeptmin: tnpct = np.ones(((daysinyear,)+tmin.shape[1:]))*np.nan
-    window = np.zeros(daysinyear,dtype=np.bool)
+    if options.verbose: print("Calculating percentiles")
+    if not options.noehf: tpct = np.ones(((timedata.daysinyear,)+tave_base.shape[1:]))*np.nan
+    if options.keeptmax: txpct = np.ones(((timedata.daysinyear,)+tmax.shape[1:]))*np.nan
+    if options.keeptmin: tnpct = np.ones(((timedata.daysinyear,)+tmin.shape[1:]))*np.nan
+    window = np.zeros(timedata.daysinyear,dtype=np.bool)
     wsize = 15.
     window[-np.int(np.floor(wsize/2.)):] = 1
     window[:np.int(np.ceil(wsize/2.))] = 1
@@ -432,7 +277,7 @@ if __name__=='__main__':
     elif options.qtilemethod=='climpact':
         percentile = qtiler.quantile_climpact
         parameter = False
-    for day in range(daysinyear):
+    for day in range(timedata.daysinyear):
         if options.keeptave:
             tpct[day,...] = percentile(tave_base[window,...], options.pcntl, parameter)
         if options.keeptmax:
@@ -480,24 +325,23 @@ if __name__=='__main__':
     if not options.keeptmax: del tmax
 
     # Remove leap days from tave
-    if (calendar=='gregorian')|(calendar=='proleptic_gregorian')|\
-                (calendar=='standard'):
+    if (timedata.calendar=='gregorian')|(timedata.calendar=='proleptic_gregorian')|(timedata.calendar=='standard'):
         if options.keeptave:
-            tave = tave[(dates.month!=2)|(dates.day!=29),...]
+            tave = tave[(timedata.dates.month!=2)|(timedata.dates.day!=29),...]
             original_shape = (tave.shape[0], original_shape[1], original_shape[2])
         if options.keeptmax:
-            tmax = tmax[(dates.month!=2)|(dates.day!=29),...]
+            tmax = tmax[(timedata.dates.month!=2)|(timedata.dates.day!=29),...]
             original_shape = (tmax.shape[0], original_shape[1], original_shape[2])
         if options.keeptmin:
-            tmin = tmin[(dates.month!=2)|(dates.day!=29),...]
+            tmin = tmin[(timedata.dates.month!=2)|(timedata.dates.day!=29),...]
             original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
         calendar = '365_day'
 
     # Remove incomplete starting year
-    first_year = dayone.year
-    if (dayone.month!=1)|(dayone.day!=1):
-        first_year = dayone.year+1
-        start = np.argmax(dates.year==first_year)
+    first_year = timedata.dayone.year
+    if (timedata.dayone.month!=1)|(timedata.dayone.day!=1):
+        first_year = timedata.dayone.year+1
+        start = np.argmax(timedata.dates.year==first_year)
         if options.keeptave:
             tave = tave[start:,...]
             original_shape = (tave.shape[0], original_shape[1], original_shape[2])
@@ -516,7 +360,7 @@ if __name__=='__main__':
             EHIaccl = tave[i-2:i+1,...].sum(axis=0)/3. - \
                     tave[i-32:i-2,...].sum(axis=0)/30.
             EHIsig = tave[i-2:i+1,...].sum(axis=0)/3. - \
-                    tpct[i-daysinyear*int((i+1)/daysinyear),...]
+                    tpct[i-timedata.daysinyear*int((i+1)/timedata.daysinyear),...]
             EHF[i,...] = np.maximum(EHIaccl,1.)*EHIsig
         EHF[EHF<0] = 0
 
@@ -525,13 +369,13 @@ if __name__=='__main__':
         if options.keeptmax:
             txexceed = np.ones(tmax.shape)*np.nan
             for i in range(0,tmax.shape[0]):
-                idoy = i-daysinyear*int((i+1)/daysinyear)
+                idoy = i-timedata.daysinyear*int((i+1)/timedata.daysinyear)
                 txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
             txexceed[txexceed>0] = tmax[txexceed>0]
         if options.keeptmin:
             tnexceed = np.ones(tmin.shape)*np.nan
             for i in range(0,tmin.shape[0]):
-                idoy = i-daysinyear*int((i+1)/daysinyear)
+                idoy = i-timedata.daysinyear*int((i+1)/timedata.daysinyear)
                 tnexceed[i,...] = tmin[i,...]>tnpct[idoy,...]
             tnexceed[tnexceed>0] = tmin[tnexceed>0]
 
@@ -542,7 +386,7 @@ if __name__=='__main__':
     if options.tn90pcd:
         event_tn, ends_tn = identify_hw(tnexceed)
 
-    nyears = len(range(first_year,daylast.year+1))
+    nyears = len(range(first_year,timedata.daylast.year+1))
 
     # Calculate yearly output
     if options.yearlyout:
@@ -597,7 +441,7 @@ if __name__=='__main__':
         yearlyout.createDimension('time', size=None)
         yearlyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
         yearlyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
-        yearlyout.createDimension('day', daysinyear)
+        yearlyout.createDimension('day', timedata.daysinyear)
         setattr(yearlyout, "author", "Tammas Loughran")
         setattr(yearlyout, "contact", "t.loughran@student.unsw.edu.au")
         setattr(yearlyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
@@ -610,7 +454,7 @@ if __name__=='__main__':
             setattr(yearlyout, "realization", realization)
             setattr(yearlyout, "initialization_method", initialization)
             setattr(yearlyout, "physics_version", physics)
-        setattr(yearlyout, "period", "%s-%s"%(str(first_year),str(daylast.year)))
+        setattr(yearlyout, "period", "%s-%s"%(str(first_year),str(timedata.daylast.year)))
         setattr(yearlyout, "base_period", "%s-%s"%(str(options.bpstart),str(options.bpend)))
         setattr(yearlyout, "percentile", "%sth"%(str(options.pcntl)))
         setattr(yearlyout, "definition", definition)
@@ -690,11 +534,11 @@ if __name__=='__main__':
         setattr(HWTout, 'long_name', 'Heatwave Timing')
         setattr(HWTout, 'units', 'days from strat of season')
         setattr(HWTout, 'description', 'First heat wave day of the season')
-        otime[:] = range(first_year, daylast.year+1)
+        otime[:] = range(first_year, timedata.daylast.year+1)
         olat[:] = lats
         lons = tmaxnc.variables[lonname][:]
         olon[:] = lons
-        dummy_array = np.ones((daysinyear,)+(len(lats),)+(len(lons),))*np.nan
+        dummy_array = np.ones((timedata.daysinyear,)+(len(lats),)+(len(lons),))*np.nan
         if options.maskfile:
             dummy_array[:,mask] = tpct
             dummy_array[np.isnan(dummy_array)] = -999.99
@@ -754,7 +598,7 @@ if __name__=='__main__':
         setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
         setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
         setattr(dailyout, "script", sys.argv[0])
-        setattr(dailyout, "period", "%s-%s"%(str(first_year),str(daylast.year)))
+        setattr(dailyout, "period", "%s-%s"%(str(first_year),str(timedata.daylast.year)))
         setattr(dailyout, "base_period", "%s-%s"%(str(options.bpstart),str(options.bpend)))
         setattr(dailyout, "percentile", "%sth"%(str(options.pcntl)))
         if model:

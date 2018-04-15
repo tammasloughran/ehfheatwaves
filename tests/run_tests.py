@@ -21,6 +21,7 @@ from ehfheatwaves import *
 from getoptions import *
 import optparse
 import qtiler
+from ncio import Calendar360, DatesOrderError
 
 
 class TestRQtiler(unittest.TestCase):
@@ -134,11 +135,11 @@ class TestCalendar360(unittest.TestCase):
 
     startdate = dt.datetime(1970,1,1)
     enddate = dt.datetime(2000,1,1)
-    calendar = calendar360(startdate, enddate)
+    calendar = Calendar360(startdate, enddate)
 
     def testEndBeforeStart(self):
         """Should return an exception if the end date is before the start date."""
-        self.assertRaises(DatesOrderError, calendar360, self.enddate, self.startdate)
+        self.assertRaises(DatesOrderError, Calendar360, self.enddate, self.startdate)
 
     def testAtributes(self):
         """Calendar object should contain 3 attributes contaning arrays."""
