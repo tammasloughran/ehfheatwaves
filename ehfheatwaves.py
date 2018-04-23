@@ -394,110 +394,11 @@ if __name__=='__main__':
         if options.tn90pc:
             ncio.save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,tnpct,"tn90pct",timedata,options,mask)
 
-
     # Save daily data to netcdf
     if options.dailyout:
-        if options.daily or options.dailyonly: defn ='EHF'
-        elif options.tx90pcd: defn = 'tx90pct'
-        elif options.tn90pcd: defn = 'tn90pct'
-        dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'\
-                %(defn, model, experiment, rip), mode='w')
-        dailyout.createDimension('time', size=None)
-        dailyout.createDimension('lon', tmaxnc.dimensions[lonname].__len__())
-        dailyout.createDimension('lat', tmaxnc.dimensions[latname].__len__())
-        setattr(dailyout, "author", "Tammas Loughran")
-        setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
-        setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
-        setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
-        setattr(dailyout, "script", sys.argv[0])
-        setattr(dailyout, "period", "%s-%s"%(str(first_year),str(timedata.daylast.year)))
-        setattr(dailyout, "base_period", "%s-%s"%(str(options.bpstart),str(options.bpend)))
-        setattr(dailyout, "percentile", "%sth"%(str(options.pcntl)))
-        if model:
-            setattr(dailyout, "model_id", model)
-            setattr(dailyout, "experiment", experiment)
-            setattr(dailyout, "parent_experiment_rip", parent)
-            setattr(dailyout, "realization", realization)
-            setattr(dailyout, "initialization_method", initialization)
-            setattr(dailyout, "physics_version", physics)
-        try:
-            file = open('version', 'r')
-            commit = file.read()[:]
-            if commit[-2:]==r'\n': commit = commit[:-2]
-        except IOError:
-            commit = "Unknown. Check date for latest version."
-        setattr(dailyout, "git_commit", commit)
-        setattr(dailyout, "tmax_file", options.tmaxfile)
-        setattr(dailyout, "tmin_file", options.tminfile)
-        if options.maskfile:
-            setattr(dailyout, "mask_file", str(options.maskfile))
-        setattr(dailyout, "quantile_method", options.qtilemethod)
-        otime = dailyout.createVariable('time', 'f8', 'time',
-                        fill_value=-999.99)
-        setattr(otime, 'units', 'days since %s-01-01'%(first_year))
-        setattr(otime, 'calendar', calendar)
-        olat = dailyout.createVariable('lat', 'f8', 'lat')
-        setattr(olat, 'standard_name', 'latitude')
-        setattr(olat, 'long_name', 'Latitude')
-        setattr(olat, 'units', 'degrees_north')
-        olon = dailyout.createVariable('lon', 'f8', 'lon')
-        setattr(olon, 'standard_name', 'longitude')
-        setattr(olon, 'long_name', 'Longitude')
-        setattr(olon, 'units', 'degrees_east')
-        oehf = dailyout.createVariable(defn, 'f8',
-                ('time','lat','lon'), fill_value=-999.99)
-        setattr(oehf, 'standard_name', defn)
-        if defn=='EHF':
-            setattr(oehf, 'long_name', 'Excess Heat Factor')
-            setattr(oehf, 'units', 'degC2')
-        elif defn=='tx90pct':
-            setattr(oehf, 'long_name', 'Temperature Exceeding tx90pct')
-            setattr(oehf, 'units', 'C')
-        elif defn=='tn90pct':
-            setattr(oehf, 'long_name', 'Temperature Exceeding tn90pct')
-            setattr(oehf, 'units', 'C')
-        oevent = dailyout.createVariable('event', 'f8',
-                ('time','lat','lon'), fill_value=-999.99)
-        setattr(oevent, 'long_name', 'Event indicator')
-        setattr(oevent, 'description',
-                'Indicates whether a heatwave is happening on that day')
-        oends = dailyout.createVariable('ends', 'f8',
-                ('time','lat','lon'), fill_value=-999.99)
-        setattr(oends, 'long_name', 'Duration at start of heatwave')
-        setattr(oends, 'units', 'days')
-        otime[:] = range(0,original_shape[0],1)
-        olat[:] = lats
-        olon[:] = tmaxnc.variables[lonname][:]
-        if options.maskfile:
-            dummy_array = np.ones(original_shape)*np.nan
-            if options.daily: dummy_array[:,mask] = EHF
-            elif options.tx90pcd: dummy_array[:,mask] = txexceed
-            elif options.tn90pcd: dummy_array[:,mask] = tnexceed
-            dummy_array[np.isnan(dummy_array)] = -999.99
-            oehf[:] = dummy_array.copy()
-            if options.daily: dummy_array[:,mask] = event
-            elif options.tx90pcd: dummy_array[:,mask] = event_tx
-            elif options.tn90pcd: dummy_array[:,mask] = event_tn
-            dummy_array[np.isnan(dummy_array)] = -999.99
-            dummy_array[:31,...] = -999.99
-            oevent[:] = dummy_array.copy()
-            if options.daily: dummy_array[:,mask] = ends
-            elif options.tx90pcd: dummy_array[:,mask] = ends_tx
-            elif options.tn90pcd: dummy_array[:,mask] = ends_tn
-            dummy_array[np.isnan(dummy_array)] = -999.99
-            dummy_array[:31,...] = -999.99
-            oends[:] = dummy_array.copy()
-        else:
-            if options.daily:
-                oehf[:] = EHF
-                oevent[:] = event
-                oends[:] = ends
-            elif options.tx90pcd:
-                oehf[:] = txexceed
-                oevent[:] = event_tx
-                oends[:] = ends_tx
-            elif options.tn90pcd:
-                oehf[:] = tnexceed
-                oevent[:] = event_tn
-                oends[:] = ends_tn
-        dailyout.close()
+        if options.keeptave:
+            ncio.save_daily(EHF, event, ends, options, timedata, original_shape, mask)
+        if options.tx90pcd:
+            ncio.save_daily(txexceed, event_tx, ends_tx, timedata, original_shape, mask)
+        if options.tn90pcd:
+            ncio.save_daily(tnexceed, event_tn, ends_tn, timedata, original_shape, mask)

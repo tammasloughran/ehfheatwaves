@@ -75,7 +75,10 @@ def get_time_data(options):
     else:
         tmaxnc = Dataset(options.tmaxfile, 'r')
         nctime = tmaxnc.variables[options.timevname]
-    timedata.calendar = nctime.calendar
+    try:
+        timedata.calendar = nctime.calendar
+    except:
+        timedata.calendar = 'proleptic_gregorian'
 
     if not timedata.calendar:
         print('Unrecognized calendar. Using gregorian.')
@@ -106,7 +109,7 @@ def get_time_data(options):
         # Remove leap days. Maybe this should be a separate function?
         timedata.noleapdates = timedata.dates[(timedata.dates.month!=2)|(timedata.dates.day!=29)]
 
-        return timedata
+    return timedata
 
 
 def get_mask(options):
@@ -236,7 +239,6 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     lonkey = [vrbl in lonnames for vrbl in tempnc.variables.keys()].index(True)
     lonvname = list(tempnc.variables.keys())[lonkey]
     space = (tempnc.dimensions['lat'].__len__(), tempnc.dimensions['lon'].__len__())
-
     yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, model, experiment, rip, options.season), 'w')
     yearlyout.createDimension('time', size=None)
     yearlyout.createDimension('lon', tempnc.dimensions[lonvname].__len__())
@@ -373,13 +375,12 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     yearlyout.close()
 
 
-def save_daily(EHF, txexceed, tnexceed, options, timedata, original_shape, mask):
+def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
     """save_daily saves the daily data to netcdf file"""
     if any([(wildcard in options.tmaxfile) for wildcard in ['*','?','[']]):
         tempnc = MFDataset(options.tmaxfile, 'r')
     else:
         tempnc = Dataset(options.tmaxfile, 'r')
-    nyears = len(range(timedata.dayone.year,timedata.daylast.year+1))
     try: experiment = tempnc.__getattribute__('experiment')
     except AttributeError: experiment = ''
     try: model = tempnc.__getattribute__('model_id')
@@ -402,7 +403,6 @@ def save_daily(EHF, txexceed, tnexceed, options, timedata, original_shape, mask)
     lonnames = ('lon', 'lons', 'longitude', 'longitudes')
     lonkey = [vrbl in lonnames for vrbl in tempnc.variables.keys()].index(True)
     lonvname = list(tempnc.variables.keys())[lonkey]
-    space = (tempnc.dimensions['lat'].__len__(), tempnc.dimensions['lon'].__len__())
     if options.daily or options.dailyonly: defn ='EHF'
     elif options.tx90pcd: defn = 'tx90pct'
     elif options.tn90pcd: defn = 'tn90pct'
@@ -416,7 +416,7 @@ def save_daily(EHF, txexceed, tnexceed, options, timedata, original_shape, mask)
     setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(dailyout, "script", sys.argv[0])
-    setattr(dailyout, "period", "%s-%s"%(str(options.yearone.year),str(timedata.daylast.year)))
+    setattr(dailyout, "period", "%s-%s"%(str(timedata.dayone.year),str(timedata.daylast.year)))
     setattr(dailyout, "base_period", "%s-%s"%(str(options.bpstart),str(options.bpend)))
     setattr(dailyout, "percentile", "%sth"%(str(options.pcntl)))
     if model:
@@ -440,7 +440,7 @@ def save_daily(EHF, txexceed, tnexceed, options, timedata, original_shape, mask)
     setattr(dailyout, "quantile_method", options.qtilemethod)
     otime = dailyout.createVariable('time', 'f8', 'time',
                     fill_value=-999.99)
-    setattr(otime, 'units', 'days since %s-01-01'%(options.yearone.year))
+    setattr(otime, 'units', 'days since %s-01-01'%(timedata.dayone.year))
     setattr(otime, 'calendar', timedata.calendar)
     olat = dailyout.createVariable('lat', 'f8', 'lat')
     setattr(olat, 'standard_name', 'latitude')
@@ -476,34 +476,20 @@ def save_daily(EHF, txexceed, tnexceed, options, timedata, original_shape, mask)
     olon[:] = tempnc.variables[lonvname][:]
     if options.maskfile:
         dummy_array = np.ones(original_shape)*np.nan
-        if options.daily: dummy_array[:,mask] = EHF
-        elif options.tx90pcd: dummy_array[:,mask] = txexceed
-        elif options.tn90pcd: dummy_array[:,mask] = tnexceed
+        if options.daily: dummy_array[:,mask] = exceed
         dummy_array[np.isnan(dummy_array)] = -999.99
         oehf[:] = dummy_array.copy()
         if options.daily: dummy_array[:,mask] = event
-        elif options.tx90pcd: dummy_array[:,mask] = event_tx
-        elif options.tn90pcd: dummy_array[:,mask] = event_tn
         dummy_array[np.isnan(dummy_array)] = -999.99
         dummy_array[:31,...] = -999.99
         oevent[:] = dummy_array.copy()
         if options.daily: dummy_array[:,mask] = ends
-        elif options.tx90pcd: dummy_array[:,mask] = ends_tx
-        elif options.tn90pcd: dummy_array[:,mask] = ends_tn
         dummy_array[np.isnan(dummy_array)] = -999.99
         dummy_array[:31,...] = -999.99
         oends[:] = dummy_array.copy()
     else:
-        if options.daily:
-            oehf[:] = EHF
-            oevent[:] = event
-            oends[:] = ends
-        elif options.tx90pcd:
-            oehf[:] = txexceed
-            oevent[:] = event_tx
-            oends[:] = ends_tx
-        elif options.tn90pcd:
-            oehf[:] = tnexceed
-            oevent[:] = event_tn
-            oends[:] = ends_tn
+        oehf[:] = exceed
+        oevent[:] = event
+        oends[:] = ends
+    tempnc.close()
     dailyout.close()

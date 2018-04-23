@@ -94,8 +94,7 @@ def parse_arguments(arguments):
         options.tx90pc = True
         options.tn90pc = True
     options.keeptmax = False
-    if options.tx90pc or options.tx90pcd:
-        options.keeptmax = True
+    if options.tx90pc or options.tx90pcd: options.keeptmax = True
     options.keeptmin = False
     if options.tn90pc or options.tn90pcd: options.keeptmin = True
     options.keeptave = True
