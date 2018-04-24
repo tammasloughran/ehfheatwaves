@@ -29,7 +29,7 @@ import ncio
 def window_percentile(temp, options, daysinyear=365, wsize=15):
     """window_percentile calculates a day-of-year moving window percentile."""
     # Initialise array.
-    pctl = np.ones(((daysinyear,)+tmax.shape[1:]))*np.nan
+    pctl = np.ones(((daysinyear,)+temp.shape[1:]))*np.nan
 
     # Construct the window.
     window = np.zeros(daysinyear,dtype=np.bool)
