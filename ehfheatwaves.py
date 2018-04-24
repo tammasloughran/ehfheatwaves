@@ -397,8 +397,8 @@ if __name__=='__main__':
     # Save daily data to netcdf
     if options.dailyout:
         if options.keeptave:
-            ncio.save_daily(EHF, event, ends, options, timedata, original_shape, mask)
+            ncio.save_daily(EHF, event, ends, options, options, timedata, original_shape, mask=mask)
         if options.tx90pcd:
-            ncio.save_daily(txexceed, event_tx, ends_tx, timedata, original_shape, mask)
+            ncio.save_daily(txexceed, event_tx, ends_tx, options, timedata, original_shape, mask=mask)
         if options.tn90pcd:
-            ncio.save_daily(tnexceed, event_tn, ends_tn, timedata, original_shape, mask)
+            ncio.save_daily(tnexceed, event_tn, ends_tn, options, timedata, original_shape, mask=mask)

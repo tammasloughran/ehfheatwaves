@@ -375,7 +375,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     yearlyout.close()
 
 
-def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
+def save_daily(exceed, event, ends, options, timedata, original_shape, mask=False):
     """save_daily saves the daily data to netcdf file"""
     if any([(wildcard in options.tmaxfile) for wildcard in ['*','?','[']]):
         tempnc = MFDataset(options.tmaxfile, 'r')
