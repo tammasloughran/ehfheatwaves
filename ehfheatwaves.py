@@ -299,7 +299,7 @@ if __name__=='__main__':
         tmax, lats = ncio.get_all_data(options.tmaxfile, options.tmaxvname, options)
         original_shape = tmax.shape
     if options.keeptave or options.keeptmin:
-        tmin, _ = ncio.get_all_data(options.tminfile, options.tminvname, options)
+        tmin, lats = ncio.get_all_data(options.tminfile, options.tminvname, options)
         original_shape = tmin.shape
     if options.keeptave:
         tave = (tmax + tmin)/2.
@@ -361,10 +361,8 @@ if __name__=='__main__':
 
     # Calculate daily output
     if options.daily: event, ends = identify_hw(EHF)
-    if options.tx90pcd:
-        event_tx, ends_tx = identify_hw(txexceed)
-    if options.tn90pcd:
-        event_tn, ends_tn = identify_hw(tnexceed)
+    if options.tx90pcd: event_tx, ends_tx = identify_hw(txexceed)
+    if options.tn90pcd: event_tn, ends_tn = identify_hw(tnexceed)
 
     nyears = len(range(first_year,timedata.daylast.year+1))
 

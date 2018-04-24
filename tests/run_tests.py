@@ -21,6 +21,7 @@ from ehfheatwaves import *
 from getoptions import *
 import optparse
 import qtiler
+from ncio import *
 from ncio import Calendar360, DatesOrderError
 
 
@@ -221,7 +222,7 @@ class TestGetOptions(unittest.TestCase):
 
     args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
             '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
-            '--vnamex=tmax' '--vnamen=tmin', '--base=1991-2010', '-v']
+            '--vnamex=tmax', '--vnamen=tmin', '--base=1991-2010', '-v']
 
     def testConstructsOptions(self):
         """The parse_arguments function should return an options object"""
@@ -263,8 +264,47 @@ class TestGetOptions(unittest.TestCase):
         """Should throw a warning if no land-sea mask is provided"""
         args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
             '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
-            '--base=abc-def']
+            '--base=2010-1960']
         self.assertWarns(UserWarning, getoptions.parse_arguments, self.args)
+
+    def testOnlyTmax(self):
+        """Should work with only tmin or only tmax."""
+        args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '--base=2010-1960']
+        self.assertIs(type(getoptions.parse_arguments(self.args)), optparse.Values)
+
+    def testOnlyTmin(self):
+        """Should work with only tmin or only tmax."""
+        args = ['-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '--base=2010-1960']
+        self.assertIs(type(getoptions.parse_arguments(self.args)), optparse.Values)
+
+class TestNCIO(unittest.TestCase):
+    """Test the ncio module (netCDF input/output)."""
+
+    args = ['-x', 'climpact2.sampledata.gridded.1991-2010.nc',
+            '-n', 'climpact2.sampledata.gridded.1991-2010.nc',
+            '--vnamex=tmax', '--vnamen=tmin', '--base=1991-2010', '-v']
+    options = getoptions.parse_arguments(args)
+    timedata = get_time_data(options)
+
+    def testTimeData(self):
+        """Should return a TimeData class"""
+        self.assertIs(type(get_time_data(self.options)), ncio.TimeData)
+        timedata = get_time_data(self.options)
+        print(timedata.calendar)
+        self.assertTrue(timedata.calendar in ['standard', '360_day', 'gregorian', 'proleptic_gregorian', '365_day'])
+        self.assertIs(type(timedata.dayone), dt.datetime)
+        self.assertIs(type(timedata.daylast), dt.datetime)
+
+    def testLoadBPData(self):
+        """Should return a numpy array"""
+        self.assertIs(type(load_bp_data(self.options, self.timedata)), np.ndarray)
+
+    def testGetAllData(self):
+        """Should return two numpy arrays"""
+        data, lats = get_all_data(self.options.tmaxfile, self.options.tmaxvname, self.options)
+
 
 if __name__=='__main__':
     # Test the script as a whole against climpact2 data.

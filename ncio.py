@@ -68,13 +68,17 @@ def get_time_data(options):
     Returns a TimeData object containing a collection of variables.
     """
     timedata = TimeData()
-    if any([(wildcard in options.tmaxfile) for wildcard in ['*','?','[']]):
-        tmaxnc = MFDataset(options.tmaxfile, 'r')
-        nctime = tmaxnc.variables[options.timevname]
+    if options.tmaxfile:
+        filename = options.tmaxfile
+    elif options.tminfile:
+        filename = options.tminfile
+    if any([(wildcard in filename) for wildcard in ['*','?','[']]):
+        tempnc = MFDataset(filename, 'r')
+        nctime = tempnc.variables[options.timevname]
         nctime = MFTime(nctime)
     else:
-        tmaxnc = Dataset(options.tmaxfile, 'r')
-        nctime = tmaxnc.variables[options.timevname]
+        tempnc = Dataset(filename, 'r')
+        nctime = tempnc.variables[options.timevname]
     try:
         timedata.calendar = nctime.calendar
     except:
@@ -97,7 +101,7 @@ def get_time_data(options):
         # 365 day season start and end indices
         timedata.SHS = (304,455)
         timedata.SHW = (120,273)
-        if tmaxnc.variables[options.timevname].units=='day as %Y%m%d.%f':
+        if tempnc.variables[options.timevname].units=='day as %Y%m%d.%f':
             st = str(int(nctime[0]))
             nd = str(int(nctime[-1]))
             timedata.dayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
@@ -176,7 +180,7 @@ def load_bp_data(options, timedata, variable='tmax', mask=None):
         if not increasing: mask = np.flipud(mask)
         temp = temp[:,mask]
 
-    if tempnc.variables[options.tmaxvname].units=='K': temp -= 273.15
+    if tempnc.variables[varname].units=='K': temp -= 273.15
 
     # Remove leap days in gregorian calendars
     if (timedata.calendar=='gregorian')|(timedata.calendar=='proleptic_gregorian')|(timedata.calendar=='standard'):
@@ -238,7 +242,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     lonnames = ('lon', 'lons', 'longitude', 'longitudes')
     lonkey = [vrbl in lonnames for vrbl in tempnc.variables.keys()].index(True)
     lonvname = list(tempnc.variables.keys())[lonkey]
-    space = (tempnc.dimensions['lat'].__len__(), tempnc.dimensions['lon'].__len__())
+    space = (tempnc.dimensions[latvname].__len__(), tempnc.dimensions[lonvname].__len__())
     yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, model, experiment, rip, options.season), 'w')
     yearlyout.createDimension('time', size=None)
     yearlyout.createDimension('lon', tempnc.dimensions[lonvname].__len__())
@@ -377,10 +381,14 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
 
 def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
     """save_daily saves the daily data to netcdf file"""
-    if any([(wildcard in options.tmaxfile) for wildcard in ['*','?','[']]):
-        tempnc = MFDataset(options.tmaxfile, 'r')
+    if options.tmaxfile:
+        filename = options.tmaxfile
+    elif options.tminfile:
+        filename = options.tminfile
+    if any([(wildcard in filename) for wildcard in ['*','?','[']]):
+        tempnc = MFDataset(filename, 'r')
     else:
-        tempnc = Dataset(options.tmaxfile, 'r')
+        tempnc = Dataset(filename, 'r')
     try: experiment = tempnc.__getattribute__('experiment')
     except AttributeError: experiment = ''
     try: model = tempnc.__getattribute__('model_id')
@@ -433,8 +441,10 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
     except IOError:
         commit = "Unknown. Check date for latest version."
     setattr(dailyout, "git_commit", commit)
-    setattr(dailyout, "tmax_file", options.tmaxfile)
-    setattr(dailyout, "tmin_file", options.tminfile)
+    if options.tmaxfile:
+        setattr(dailyout, "tmax_file", options.tmaxfile)
+    if options.tminfile:
+        setattr(dailyout, "tmin_file", options.tminfile)
     if options.maskfile:
         setattr(dailyout, "mask_file", str(options.maskfile))
     setattr(dailyout, "quantile_method", options.qtilemethod)

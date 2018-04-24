@@ -68,7 +68,7 @@ def parse_arguments(arguments):
     options, args = parser.parse_args(arguments)
 
     # Handle errors and warnings
-    if not options.tmaxfile or not options.tminfile: raise NoTmaxTminFileError
+    if not options.tmaxfile and not options.tminfile: raise NoTmaxTminFileError
     if not '-' in options.bp: raise InvalidBPFormatError(options.bp)
     try:
         int(options.bp[:options.bp.index('-')])
