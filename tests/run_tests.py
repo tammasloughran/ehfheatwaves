@@ -17,12 +17,11 @@ warnings.simplefilter('ignore',category=RuntimeWarning)
 import numpy as np
 import datetime as dt
 import unittest
-from ehfheatwaves import *
-from getoptions import *
+import ehfheatwaves
 import optparse
+import getoptions
 import qtiler
-from ncio import *
-from ncio import Calendar360, DatesOrderError
+import ncio
 
 
 class TestRQtiler(unittest.TestCase):
@@ -136,11 +135,11 @@ class TestCalendar360(unittest.TestCase):
 
     startdate = dt.datetime(1970,1,1)
     enddate = dt.datetime(2000,1,1)
-    calendar = Calendar360(startdate, enddate)
+    calendar = ncio.Calendar360(startdate, enddate)
 
     def testEndBeforeStart(self):
         """Should return an exception if the end date is before the start date."""
-        self.assertRaises(DatesOrderError, Calendar360, self.enddate, self.startdate)
+        self.assertRaises(ncio.DatesOrderError, ncio.Calendar360, self.enddate, self.startdate)
 
     def testAtributes(self):
         """Calendar object should contain 3 attributes contaning arrays."""
@@ -166,20 +165,20 @@ class TestIdentifyHW(unittest.TestCase):
 
     def testReturnTupple(self):
         """Should return a tupple containging the event indicator and the durations (numpy.ndarray)."""
-        result = identify_hw(self.ehfdata)
+        result = ehfheatwaves.identify_hw(self.ehfdata)
         self.assertIs(tuple, type(result))
         self.assertIs(np.ndarray, type(result[0]))
         self.assertIs(np.ndarray, type(result[1]))
 
     def testKnownEventsEnds(self):
         """Tests the known cases."""
-        events, ends = identify_hw(self.ehfdata)
+        events, ends = ehfheatwaves.identify_hw(self.ehfdata)
         self.assertTrue((events==self.known_events).all())
         self.assertTrue((ends==self.known_ends).all())
 
     def testShape(self):
         """The shape of the input EHF index and the outputs should be the same."""
-        events, ends = identify_hw(self.ehfdata)
+        events, ends = ehfheatwaves.identify_hw(self.ehfdata)
         input_shape = self.ehfdata.shape
         self.assertEqual(events.shape, input_shape)
         self.assertEqual(ends.shape, input_shape)
@@ -198,20 +197,20 @@ class TestIdentifySemiHW(unittest.TestCase):
 
     def testReturnTupple(self):
         """Should return a tupple containging the event indicator and the durations (numpy.ndarrays)."""
-        result = identify_hw(self.ehfdata)
+        result = ehfheatwaves.identify_hw(self.ehfdata)
         self.assertIs(tuple, type(result))
         self.assertIs(np.ndarray, type(result[0]))
         self.assertIs(np.ndarray, type(result[1]))
 
     def testKnownEventsEnds(self):
         """Tests the known cases."""
-        events, ends = identify_hw(self.ehfdata)
+        events, ends = ehfheatwaves.identify_hw(self.ehfdata)
         self.assertTrue((events==self.known_events).all())
         self.assertTrue((ends==self.known_ends).all())
 
     def testShape(self):
         """The shape of the input EHF index and the outputs should be the same."""
-        events, ends = identify_hw(self.ehfdata)
+        events, ends = ehfheatwaves.identify_hw(self.ehfdata)
         input_shape = self.ehfdata.shape
         self.assertEqual(events.shape, input_shape)
         self.assertEqual(ends.shape, input_shape)
@@ -222,6 +221,7 @@ class TestGetOptions(unittest.TestCase):
 
     args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
             '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
+            '-m', 'maskfile.nc',
             '--vnamex=tmax', '--vnamen=tmin', '--base=1991-2010', '-v']
 
     def testConstructsOptions(self):
@@ -230,21 +230,21 @@ class TestGetOptions(unittest.TestCase):
 
     def testNoFilesError(self):
         """Should return an exception if no data files are provided."""
-        self.assertRaises(NoTmaxTminFileError, getoptions.parse_arguments, ['-v'])
+        self.assertRaises(getoptions.NoTmaxTminFileError, getoptions.parse_arguments, ['-v'])
 
     def testInvalidBP(self):
         """Should return an exception if the base period is not in the correct format."""
         args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
             '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
             '--base=19912010']
-        self.assertRaises(InvalidBPFormatError, getoptions.parse_arguments, args)
+        self.assertRaises(getoptions.InvalidBPFormatError, getoptions.parse_arguments, args)
 
     def testInvalidSeason(self):
         """Should return an exception if an invalis season is provided."""
         args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
             '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
-            '--base=1991-2010', '--season=autmn']
-        self.assertRaises(InvalidSeasonError, getoptions.parse_arguments, args)
+            '--base=1991-2010', '--season=autumn']
+        self.assertRaises(getoptions.InvalidSeasonError, getoptions.parse_arguments, args)
 
     def testBPOrder(self):
         """Should return an assertion error if the start year of the base period is before the end year"""
@@ -264,20 +264,21 @@ class TestGetOptions(unittest.TestCase):
         """Should throw a warning if no land-sea mask is provided"""
         args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
             '-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
-            '--base=2010-1960']
-        self.assertWarns(UserWarning, getoptions.parse_arguments, self.args)
+            '--vnamex=tmax', '--vnamen=tmin', '--base=1991-2010', '-v']
+        self.assertWarns(UserWarning, getoptions.parse_arguments, args)
 
     def testOnlyTmax(self):
         """Should work with only tmin or only tmax."""
         args = ['-x', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
-            '--base=2010-1960']
-        self.assertIs(type(getoptions.parse_arguments(self.args)), optparse.Values)
+            '--base=1960-2010']
+        self.assertIs(type(getoptions.parse_arguments(args)), optparse.Values)
 
     def testOnlyTmin(self):
         """Should work with only tmin or only tmax."""
         args = ['-n', 'tests/climpact2.sampledata.gridded.1991-2010.nc',
-            '--base=2010-1960']
-        self.assertIs(type(getoptions.parse_arguments(self.args)), optparse.Values)
+            '--base=1960-2010']
+        self.assertIs(type(getoptions.parse_arguments(args)), optparse.Values)
+
 
 class TestNCIO(unittest.TestCase):
     """Test the ncio module (netCDF input/output)."""
@@ -286,12 +287,12 @@ class TestNCIO(unittest.TestCase):
             '-n', 'climpact2.sampledata.gridded.1991-2010.nc',
             '--vnamex=tmax', '--vnamen=tmin', '--base=1991-2010', '-v']
     options = getoptions.parse_arguments(args)
-    timedata = get_time_data(options)
+    timedata = ncio.get_time_data(options)
 
     def testTimeData(self):
         """Should return a TimeData class"""
-        self.assertIs(type(get_time_data(self.options)), ncio.TimeData)
-        timedata = get_time_data(self.options)
+        self.assertIs(type(ncio.get_time_data(self.options)), ncio.TimeData)
+        timedata = ncio.get_time_data(self.options)
         print(timedata.calendar)
         self.assertTrue(timedata.calendar in ['standard', '360_day', 'gregorian', 'proleptic_gregorian', '365_day'])
         self.assertIs(type(timedata.dayone), dt.datetime)
@@ -299,11 +300,11 @@ class TestNCIO(unittest.TestCase):
 
     def testLoadBPData(self):
         """Should return a numpy array"""
-        self.assertIs(type(load_bp_data(self.options, self.timedata)), np.ndarray)
+        self.assertIs(type(ncio.load_bp_data(self.options, self.timedata)), np.ndarray)
 
     def testGetAllData(self):
         """Should return two numpy arrays"""
-        data, lats = get_all_data(self.options.tmaxfile, self.options.tmaxvname, self.options)
+        data, lats = ncio.get_all_data(self.options.tmaxfile, self.options.tmaxvname, self.options)
 
 
 if __name__=='__main__':
@@ -338,7 +339,7 @@ if __name__=='__main__':
     testnc = nc.Dataset('testfile.nc','r')
     hwf = testnc.variables['HWF_EHF'][:]
     thwdata = np.ones((6,)+hwf.shape)
-    thwdata[0,...] = hwf
+    thwdata[0,...] = testnc.variables['HWF_EHF'][:]
     thwdata[1,...] = testnc.variables['HWN_EHF'][:]
     thwdata[2,...] = testnc.variables['HWD_EHF'][:]
     thwdata[3,...] = testnc.variables['HWA_EHF'][:]

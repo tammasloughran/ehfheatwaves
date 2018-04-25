@@ -185,9 +185,14 @@ def load_bp_data(options, timedata, variable='tmax', mask=None):
     # Remove leap days in gregorian calendars
     if (timedata.calendar=='gregorian')|(timedata.calendar=='proleptic_gregorian')|(timedata.calendar=='standard'):
         temp = temp[(dates_base.month!=2)|(dates_base.day!=29),...]
-        del dates_base
+
     tempnc.close()
     return temp
+
+
+def remove_leap_days(data, dates):
+    """remove_leap_days removes February 29th from a dataset"""
+    return data[(dates.month!=2)|(dates.day!=29),...]
 
 
 def get_all_data(files, vname, options):
@@ -214,7 +219,9 @@ def get_all_data(files, vname, options):
 
 
 def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
-    """Save yearly data to netcdf file."""
+    """Save yearly data to netcdf file.
+    Input aspect arrays are 2D, timeXspace and are either reshaped or indexed
+    with a land-sea mask"""
     if any([(wildcard in options.tmaxfile) for wildcard in ['*','?','[']]):
         tempnc = MFDataset(options.tmaxfile, 'r')
     else:
@@ -380,7 +387,9 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
 
 
 def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
-    """save_daily saves the daily data to netcdf file"""
+    """save_daily saves the daily data to netcdf file.
+    Input arrays are 2D, timeXspace and are either reshaped or indexed
+    with a land-sea mask"""
     if options.tmaxfile:
         filename = options.tmaxfile
     elif options.tminfile:

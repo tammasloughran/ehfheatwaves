@@ -211,6 +211,10 @@ def hw_aspects(EHF, season, hemisphere):
 def split_hemispheres(EHF):
     """split_hemispheres splits the input data by hemispheres, and glues them
     back together after heatwave calculations.
+
+    The EHF spatial axes are reshaped into a single dimension.
+    The output arrays are 2D. When saving, data should be reshaped or indexed
+    with a land-sea mask.
     """
     if south:
         if options.maskfile:
@@ -262,6 +266,7 @@ def split_hemispheres(EHF):
         HWT = HWT_s
     return HWA, HWM, HWN, HWF, HWD, HWT
 
+
 if __name__=='__main__':
 
     # Get the options and variables
@@ -294,7 +299,7 @@ if __name__=='__main__':
     if not options.noehf: del tave_base
 
     # Load all data
-    if options.verbose:print("Loading data")
+    if options.verbose: print("Loading data")
     if options.keeptave or options.keeptmax:
         tmax, lats = ncio.get_all_data(options.tmaxfile, options.tmaxvname, options)
         original_shape = tmax.shape
@@ -315,7 +320,7 @@ if __name__=='__main__':
         if options.keeptmin or options.keeptave:
             tmin = tmin[(timedata.dates.month!=2)|(timedata.dates.day!=29),...]
             original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
-        calendar = '365_day'
+        timedata.calendar = '365_day'
 
     # Remove incomplete starting year
     first_year = timedata.dayone.year
