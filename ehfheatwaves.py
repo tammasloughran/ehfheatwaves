@@ -337,6 +337,15 @@ if __name__=='__main__':
             tmin = tmin[start:,...]
             original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
 
+    # Apply mask
+    if options.maskfile:
+        if options.keeptave:
+            tave = tave[:,mask]
+        if options.keeptmax:
+            tmax = tmax[:,mask]
+        if options.keeptmin:
+            tmin = tmin[:,mask]
+
     if options.verbose: print("Caclulating definition")
     # Calculate EHF
     if not options.noehf:
