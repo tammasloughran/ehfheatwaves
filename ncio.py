@@ -495,14 +495,14 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
     olon[:] = tempnc.variables[lonvname][:]
     if options.maskfile:
         dummy_array = np.ones(original_shape)*np.nan
-        if options.daily: dummy_array[:,mask] = exceed
+        dummy_array[:,mask] = exceed
         dummy_array[np.isnan(dummy_array)] = -999.99
         oehf[:] = dummy_array.copy()
-        if options.daily: dummy_array[:,mask] = event
+        dummy_array[:,mask] = event
         dummy_array[np.isnan(dummy_array)] = -999.99
         dummy_array[:31,...] = -999.99
         oevent[:] = dummy_array.copy()
-        if options.daily: dummy_array[:,mask] = ends
+        dummy_array[:,mask] = ends
         dummy_array[np.isnan(dummy_array)] = -999.99
         dummy_array[:31,...] = -999.99
         oends[:] = dummy_array.copy()
