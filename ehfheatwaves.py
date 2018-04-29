@@ -355,6 +355,12 @@ if __name__=='__main__':
             EHIsig = tave[i-2:i+1,...].sum(axis=0)/3. - tpct[i-timedata.daysinyear*int((i+1)/timedata.daysinyear),...]
             EHF[i,...] = np.maximum(EHIaccl,1.)*EHIsig
         EHF[EHF<0] = 0
+    if options.ehi:
+        EHIaccl = np.ones(tave.shape)*np.nan
+        EHIsig = np.ones(tave.shape)*np.nan
+        for i in range(32,tave.shape[0]):
+            EHIaccl[i,...] = tave[i-2:i+1,...].sum(axis=0)/3. - tave[i-32:i-2,...].sum(axis=0)/30.
+            EHIsig[i,...] = tave[i-2:i+1,...].sum(axis=0)/3. - tpct[i-timedata.daysinyear*int((i+1)/timedata.daysinyear),...]
 
     # Tx90pc exceedences
     if options.keeptmin or options.keeptmax:
@@ -409,3 +415,7 @@ if __name__=='__main__':
             ncio.save_daily(txexceed, event_tx, ends_tx, options, timedata, original_shape, mask)
         if options.tn90pcd:
             ncio.save_daily(tnexceed, event_tn, ends_tn, options, timedata, original_shape, mask)
+
+    # save EHIs
+    if options.ehi:
+        ncio.save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask)

@@ -500,3 +500,109 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
         oends[:] = ends
     tempnc.close()
     dailyout.close()
+
+
+def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
+    """save_ehi saves the daily data to netcdf file.
+    Input arrays are 2D, timeXspace and are either reshaped or indexed
+    with a land-sea mask"""
+    if options.tmaxfile:
+        filename = options.tmaxfile
+    elif options.tminfile:
+        filename = options.tminfile
+    if any([(wildcard in filename) for wildcard in ['*','?','[']]):
+        tempnc = MFDataset(filename, 'r')
+    else:
+        tempnc = Dataset(filename, 'r')
+    try: experiment = tempnc.__getattribute__('experiment')
+    except AttributeError: experiment = ''
+    try: model = tempnc.__getattribute__('model_id')
+    except AttributeError: model = ''
+    try: parent = tempnc.__getattribute__('parent_experiment_rip')
+    except AttributeError: parent = ''
+    try: realization = tempnc.__getattribute__('realization')
+    except AttributeError: realization = ''
+    try: initialization = tempnc.__getattribute__('initialization_method')
+    except AttributeError: initialization = ''
+    try:
+        physics = tempnc.__getattribute__('physics_version')
+        rip = 'r'+str(realization)+'i'+str(initialization)+'p'+str(physics)
+    except AttributeError:
+        physics = ''
+        rip = ''
+    latnames = ('lat', 'lats', 'latitude', 'latitudes')
+    latkey = [vrbl in latnames for vrbl in tempnc.variables.keys()].index(True)
+    latvname = list(tempnc.variables.keys())[latkey]
+    lonnames = ('lon', 'lons', 'longitude', 'longitudes')
+    lonkey = [vrbl in lonnames for vrbl in tempnc.variables.keys()].index(True)
+    lonvname = list(tempnc.variables.keys())[lonkey]
+    defn ='EHI'
+    dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'%(defn, model, experiment, rip), mode='w')
+    dailyout.createDimension('time', size=None)
+    dailyout.createDimension('lon', tempnc.dimensions[lonvname].__len__())
+    dailyout.createDimension('lat', tempnc.dimensions[latvname].__len__())
+    setattr(dailyout, "author", "Tammas Loughran")
+    setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
+    setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
+    setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
+    setattr(dailyout, "script", sys.argv[0])
+    setattr(dailyout, "period", "%s-%s"%(str(timedata.dayone.year),str(timedata.daylast.year)))
+    setattr(dailyout, "base_period", "%s-%s"%(str(options.bpstart),str(options.bpend)))
+    setattr(dailyout, "percentile", "%sth"%(str(options.pcntl)))
+    if model:
+        setattr(dailyout, "model_id", model)
+        setattr(dailyout, "experiment", experiment)
+        setattr(dailyout, "parent_experiment_rip", parent)
+        setattr(dailyout, "realization", realization)
+        setattr(dailyout, "initialization_method", initialization)
+        setattr(dailyout, "physics_version", physics)
+    try:
+        file = open('version', 'r')
+        commit = file.read()[:]
+        if commit[-2:]==r'\n': commit = commit[:-2]
+    except IOError:
+        commit = "Unknown. Check date for latest version."
+    setattr(dailyout, "git_commit", commit)
+    if options.tmaxfile:
+        setattr(dailyout, "tmax_file", options.tmaxfile)
+    if options.tminfile:
+        setattr(dailyout, "tmin_file", options.tminfile)
+    if options.maskfile:
+        setattr(dailyout, "mask_file", str(options.maskfile))
+    setattr(dailyout, "quantile_method", options.qtilemethod)
+    otime = dailyout.createVariable('time', 'f8', 'time', fill_value=-999.99)
+    setattr(otime, 'units', 'days since %s-01-01'%(timedata.dayone.year))
+    setattr(otime, 'calendar', timedata.calendar)
+    olat = dailyout.createVariable('lat', 'f8', 'lat')
+    setattr(olat, 'standard_name', 'latitude')
+    setattr(olat, 'long_name', 'Latitude')
+    setattr(olat, 'units', 'degrees_north')
+    olon = dailyout.createVariable('lon', 'f8', 'lon')
+    setattr(olon, 'standard_name', 'longitude')
+    setattr(olon, 'long_name', 'Longitude')
+    setattr(olon, 'units', 'degrees_east')
+    oehisig = dailyout.createVariable('EHIsig', 'f8', ('time','lat','lon'), fill_value=-999.99)
+    setattr(oehisig, 'standard_name', 'EHIsig')
+    setattr(oehisig, 'long_name', 'Excess Heat Index Significance')
+    setattr(oehisig, 'units', 'C')
+    oehiaccl = dailyout.createVariable('EHIaccl', 'f8', ('time','lat','lon'), fill_value=-999.99)
+    setattr(oehiaccl, 'standard_name', 'EHIaccl')
+    setattr(oehiaccl, 'long_name', 'Excess Heat Index Acclimatisation')
+    setattr(oehisig, 'units', 'C')
+    otime[:] = range(0,original_shape[0],1)
+    olat[:] = tempnc.variables[latvname][:]
+    olon[:] = tempnc.variables[lonvname][:]
+    if options.maskfile:
+        dummy_array = np.ones(original_shape)*np.nan
+        dummy_array[:,mask] = EHIsig
+        dummy_array[np.isnan(dummy_array)] = -999.99
+        oehisig[:] = dummy_array.copy()
+        dummy_array[:,mask] = EHIaccl
+        dummy_array[np.isnan(dummy_array)] = -999.99
+        dummy_array[:31,...] = -999.99
+        oehiaccl[:] = dummy_array.copy()
+    else:
+        oehisig[:] = EHIsig
+        oehiaccl[:] = EHIaccl
+    tempnc.close()
+    dailyout.close()

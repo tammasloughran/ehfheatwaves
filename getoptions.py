@@ -54,6 +54,7 @@ def parse_arguments(arguments):
     parser.add_option('--base', dest='bp', default='1961-1990', help='base period to calculate thresholds. Default 1961-1990', metavar='YYYY-YYYY')
     parser.add_option('-q', '--qmethod', dest='qtilemethod', default='climpact', help='quantile interpolation method. Default is climpact', metavar='STR')
     parser.add_option('-d', '--daily', action="store_true", dest='daily', default=False, help='output daily EHF values and heatwave indicators')
+    parser.add_option('--ehi', dest='ehi', action='store_true', default=False, help='Save the EHI values')
     parser.add_option('--dailyonly', action="store_true", dest='dailyonly', help='output only daily EHF values and suppress yearly output')
     parser.add_option('--t90pc', action="store_true", dest='t90pc', help='Calculate tx90pc and tn90pc heatwaves')
     parser.add_option('--tx90pc', action="store_true", dest='tx90pc', help='Calculate tx90pc seasonal heatwaves')
