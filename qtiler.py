@@ -6,7 +6,9 @@ interpolation methods.
 
 @author: Tammas Loughran
 """
-
+import numpy as np
+import math
+import sys
 
 class InvalidPercentileError(Exception):
     """Exception to be raised if the provided percentile is invalid."""
@@ -34,7 +36,6 @@ def quantile_R(x, p, itype=7, fraction=False, rmnans=False):
     Returns
     q -- quantile at pth percentile
     """
-    import numpy as np
 
     # Convert the percentile to a fraction
     if not fraction:
@@ -143,8 +144,6 @@ def quantile_zhang(y, p, fraction=False, rmnans=False):
     Returns
     Qp -- qualtile of pth percentile
     """
-    import numpy as np
-    import math
     # Convert the percentile to a fraction
     if not fraction:
         p = p/100.
@@ -186,15 +185,32 @@ def quantile_zhang(y, p, fraction=False, rmnans=False):
     return Qp
 
 
+def quantile_zhang_fast(x, q, fraction=False, rmnans=False):
+    """A faster version of quantile_zhang. Thanks goes to Mathias Hauser for this."""
+    n = x.shape[0]
+    # Convert the percentile to a fraction
+    if fraction:
+        q = q*100.
+    if (q<0) or (q>100): raise InvalidPercentileError(q)
+    if q==100.: return max(x)
+    elif q==0.: return min(x)
+    # adjust p such that np.percentile returns the same as quantile_zhang
+    #  numpy uses (n -1); quantile_zhang uses (n + 1)
+    q_adj = q * (n + 1.) / (n - 1.)
+    #  numpy uses indices j and j+1; quantile_zhang uses j-1 and j
+    q_adj -= 1. * 100./(n - 1)
+    # ensure q_adj is in 0..100.
+    assert (q_adj>=0.)&(q_adj<=100.), "q_adj is not within 0-100, q_adj=%s"%(q_adj)
+
+    return np.percentile(x, q_adj, axis=0)
+
+
 def quantile_climpact(y,p,fraction=False):
     """quantile function used by climpact.
 
-    Copy of the c_quantile function unsed in climpact.
+    Copy of the c_quantile function used in climpact.
     I have no idea where the interpolation is from.
     """
-    import numpy as np
-    import math
-    import sys
     if not fraction:
         p = p/100.
     if (p>1) or (p<0): raise InvalidPercentileError(p)

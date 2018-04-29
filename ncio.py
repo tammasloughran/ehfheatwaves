@@ -168,10 +168,10 @@ def load_bp_data(options, timedata, variable='tmax', mask=None):
     if len(temp.shape)==4: temp = temp.squeeze()
 
     # Test for increasing latitude and flip if decreasing
-    try:
-        lats = tempnc.variables['lat'][:]
-    except KeyError:
-        lats = tempnc.variables['latitude'][:]
+    latnames = ('lat', 'lats', 'latitude', 'latitudes')
+    latkey = [vrbl in latnames for vrbl in tempnc.variables.keys()].index(True)
+    latvname = list(tempnc.variables.keys())[latkey]
+    lats = tempnc.variables[latvname][:]
     increasing = (lats[0]-lats[-1])<0
     if not increasing:
         lats = np.flipud(lats)
@@ -196,7 +196,11 @@ def remove_leap_days(data, dates):
 
 
 def get_all_data(files, vname, options):
-    """get_all_data loads all temperature data from a netcdf file."""
+    """get_all_data loads all temperature data from a netcdf file.
+
+    Returns
+    temp - data in (time, x, y) coordinates.
+    lats - latitudes"""
     if any([(wildcard in files) for wildcard in ['*','?','[']]):
         tempnc = MFDataset(files, 'r')
     else:
@@ -287,8 +291,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     if options.maskfile:
         setattr(yearlyout, "mask_file", options.maskfile)
     setattr(yearlyout, "quantile_method", options.qtilemethod)
-    otime = yearlyout.createVariable('time', 'f8', 'time',
-            fill_value=-999.99)
+    otime = yearlyout.createVariable('time', 'f8', 'time', fill_value=-999.99)
     setattr(otime, 'units', 'year')
     olat = yearlyout.createVariable('lat', 'f8', 'lat')
     setattr(olat, 'standard_name', 'latitude')
@@ -300,14 +303,11 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
     setattr(olon, 'axis', 'X')
-    otpct = yearlyout.createVariable('t%spct'%(options.pcntl), 'f8',
-	    ('day','lat','lon'), fill_value=-999.99)
+    otpct = yearlyout.createVariable('t%spct'%(options.pcntl), 'f8', ('day','lat','lon'), fill_value=-999.99)
     setattr(otpct, 'long_name', '90th percentile')
     setattr(otpct, 'units', 'degC')
-    setattr(otpct, 'description',
-            '90th percentile of %s-%s'%(str(options.bpstart),str(options.bpend)))
-    HWAout = yearlyout.createVariable('HWA_%s'%(definition), 'f8',
-            ('time','lat','lon'), fill_value=-999.99)
+    setattr(otpct, 'description', '90th percentile of %s-%s'%(str(options.bpstart),str(options.bpend)))
+    HWAout = yearlyout.createVariable('HWA_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
     setattr(HWAout, 'long_name', 'Heatwave Amplitude')
     if definition=='tx90pct':
         setattr(HWAout, 'units', 'degC')
@@ -315,10 +315,8 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
         setattr(HWAout, 'units', 'degC')
     elif definition=='EHF':
         setattr(HWAout, 'units', 'degC2')
-    setattr(HWAout, 'description',
-            'Peak of the hottest heatwave per year')
-    HWMout = yearlyout.createVariable('HWM_%s'%(definition), 'f8',
-            ('time','lat','lon'), fill_value=-999.99)
+    setattr(HWAout, 'description', 'Peak of the hottest heatwave per year')
+    HWMout = yearlyout.createVariable('HWM_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
     setattr(HWMout, 'long_name', 'Heatwave Magnitude')
     if definition=='tx90pct':
         setattr(HWAout, 'units', 'degC')
@@ -327,23 +325,19 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     elif definition=='EHF':
         setattr(HWAout, 'units', 'degC2')
     setattr(HWMout, 'description', 'Average magnitude of the yearly heatwave')
-    HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8',
-            ('time', 'lat', 'lon'), fill_value=-999.99)
+    HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8', ('time', 'lat', 'lon'), fill_value=-999.99)
     setattr(HWNout, 'long_name', 'Heatwave Number')
     setattr(HWNout, 'units','heatwaves')
     setattr(HWNout, 'description', 'Number of heatwaves per year')
-    HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8',
-            ('time','lat','lon'), fill_value=-999.99)
+    HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
     setattr(HWFout, 'long_name','Heatwave Frequency')
     setattr(HWFout, 'units', 'days')
     setattr(HWFout, 'description', 'Proportion of heatwave days per season')
-    HWDout = yearlyout.createVariable('HWD_%s'%(definition), 'f8',
-            ('time','lat','lon'), fill_value=-999.99)
+    HWDout = yearlyout.createVariable('HWD_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
     setattr(HWDout, 'long_name', 'Heatwave Duration')
     setattr(HWDout, 'units', 'days')
     setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
-    HWTout = yearlyout.createVariable('HWT_%s'%(definition), 'f8',
-            ('time','lat','lon'), fill_value=-999.99)
+    HWTout = yearlyout.createVariable('HWT_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
     setattr(HWTout, 'long_name', 'Heatwave Timing')
     setattr(HWTout, 'units', 'days from strat of season')
     setattr(HWTout, 'description', 'First heat wave day of the season')
@@ -423,8 +417,7 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
     if options.daily or options.dailyonly: defn ='EHF'
     elif options.tx90pcd: defn = 'tx90pct'
     elif options.tn90pcd: defn = 'tn90pct'
-    dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'\
-            %(defn, model, experiment, rip), mode='w')
+    dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'%(defn, model, experiment, rip), mode='w')
     dailyout.createDimension('time', size=None)
     dailyout.createDimension('lon', tempnc.dimensions[lonvname].__len__())
     dailyout.createDimension('lat', tempnc.dimensions[latvname].__len__())
@@ -457,8 +450,7 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
     if options.maskfile:
         setattr(dailyout, "mask_file", str(options.maskfile))
     setattr(dailyout, "quantile_method", options.qtilemethod)
-    otime = dailyout.createVariable('time', 'f8', 'time',
-                    fill_value=-999.99)
+    otime = dailyout.createVariable('time', 'f8', 'time', fill_value=-999.99)
     setattr(otime, 'units', 'days since %s-01-01'%(timedata.dayone.year))
     setattr(otime, 'calendar', timedata.calendar)
     olat = dailyout.createVariable('lat', 'f8', 'lat')
@@ -469,8 +461,7 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
     setattr(olon, 'standard_name', 'longitude')
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
-    oehf = dailyout.createVariable(defn, 'f8',
-            ('time','lat','lon'), fill_value=-999.99)
+    oehf = dailyout.createVariable(defn, 'f8', ('time','lat','lon'), fill_value=-999.99)
     setattr(oehf, 'standard_name', defn)
     if defn=='EHF':
         setattr(oehf, 'long_name', 'Excess Heat Factor')
@@ -481,13 +472,10 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
     elif defn=='tn90pct':
         setattr(oehf, 'long_name', 'Temperature Exceeding tn90pct')
         setattr(oehf, 'units', 'C')
-    oevent = dailyout.createVariable('event', 'f8',
-            ('time','lat','lon'), fill_value=-999.99)
+    oevent = dailyout.createVariable('event', 'f8', ('time','lat','lon'), fill_value=-999.99)
     setattr(oevent, 'long_name', 'Event indicator')
-    setattr(oevent, 'description',
-            'Indicates whether a heatwave is happening on that day')
-    oends = dailyout.createVariable('ends', 'f8',
-            ('time','lat','lon'), fill_value=-999.99)
+    setattr(oevent, 'description', 'Indicates whether a heatwave is happening on that day')
+    oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'), fill_value=-999.99)
     setattr(oends, 'long_name', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
     otime[:] = range(0,original_shape[0],1)

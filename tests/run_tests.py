@@ -96,6 +96,35 @@ class TestZhangQtiler(unittest.TestCase):
         """Test a known case for corectness."""
         self.assertEqual(qtiler.quantile_zhang(self.testdata,70),7.0)
 
+    # Fast verison
+    def testNegativeP2(self):
+        """p < 0 should return an exception error."""
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_zhang_fast, self.testdata, -1)
+
+    def testZeroP2(self):
+        """p = 0 should return the lowest value."""
+        self.assertEqual(qtiler.quantile_zhang_fast(self.testdata,0), min(self.testdata))
+
+    def testHundredP2(self):
+        """p = 100 should return the largest value."""
+        self.assertEqual(qtiler.quantile_zhang_fast(self.testdata,100), max(self.testdata))
+
+    def testHundredPlusP2(self):
+        """p > 100 should return an exception error."""
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_zhang_fast, self.testdata, 101)
+
+    def testFractionOneP2(self):
+        """p = 1 as a fraction should return the largest value."""
+        self.assertEqual(qtiler.quantile_zhang_fast(self.testdata,1,fraction=True), max(self.testdata))
+
+    def testPercentAsFraction2(self):
+        """p (when fraction) > 1 should return an exception Error."""
+        self.assertRaises(qtiler.InvalidPercentileError, qtiler.quantile_zhang_fast, self.testdata, 50, fraction=True)
+
+    def testKnownCase2(self):
+        """Test a known case for corectness."""
+        self.assertEqual(qtiler.quantile_zhang_fast(self.testdata,70),7.0)
+
 
 class TestClimpactQtiler(unittest.TestCase):
     """Test the climapact quantile function"""
@@ -308,6 +337,8 @@ class TestNCIO(unittest.TestCase):
 
 
 if __name__=='__main__':
+    # Tests that need to be added.
+    # Test that it works with and without a land sea mask
     # Test the script as a whole against climpact2 data.
     # Define command and arguments
     if sys.version[0]=='3':

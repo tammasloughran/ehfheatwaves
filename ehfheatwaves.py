@@ -42,7 +42,7 @@ def window_percentile(temp, options, daysinyear=365, wsize=15):
         percentile = np.percentile
         parameter = 0
     elif options.qtilemethod=='zhang':
-        percentile = qtiler.quantile_zhang
+        percentile = qtiler.quantile_zhang_fast
         parameter = False
     elif options.qtilemethod=='matlab':
         percentile = qtiler.quantile_R
@@ -351,10 +351,8 @@ if __name__=='__main__':
     if not options.noehf:
         EHF = np.ones(tave.shape)*np.nan
         for i in range(32,tave.shape[0]):
-            EHIaccl = tave[i-2:i+1,...].sum(axis=0)/3. - \
-                    tave[i-32:i-2,...].sum(axis=0)/30.
-            EHIsig = tave[i-2:i+1,...].sum(axis=0)/3. - \
-                    tpct[i-timedata.daysinyear*int((i+1)/timedata.daysinyear),...]
+            EHIaccl = tave[i-2:i+1,...].sum(axis=0)/3. - tave[i-32:i-2,...].sum(axis=0)/30.
+            EHIsig = tave[i-2:i+1,...].sum(axis=0)/3. - tpct[i-timedata.daysinyear*int((i+1)/timedata.daysinyear),...]
             EHF[i,...] = np.maximum(EHIaccl,1.)*EHIsig
         EHF[EHF<0] = 0
 
@@ -387,14 +385,11 @@ if __name__=='__main__':
         north = (lats>0).any()
         south = (lats<=0).any()
         if not options.noehf:
-            HWA_EHF, HWM_EHF, HWN_EHF, HWF_EHF, HWD_EHF, HWT_EHF = \
-                    split_hemispheres(EHF)
+            HWA_EHF, HWM_EHF, HWN_EHF, HWF_EHF, HWD_EHF, HWT_EHF = split_hemispheres(EHF)
         if options.tx90pc:
-            HWA_tx, HWM_tx, HWN_tx, HWF_tx, HWD_tx, HWT_tx = \
-                    split_hemispheres(txexceed)
+            HWA_tx, HWM_tx, HWN_tx, HWF_tx, HWD_tx, HWT_tx = split_hemispheres(txexceed)
         if options.tn90pc:
-            HWA_tn, HWM_tn, HWN_tn, HWF_tn, HWD_tn, HWT_tn = \
-                    split_hemispheres(tnexceed)
+            HWA_tn, HWM_tn, HWN_tn, HWF_tn, HWD_tn, HWT_tn = split_hemispheres(tnexceed)
 
     if options.verbose: print("Saving")
     # Save yearly data to netcdf
