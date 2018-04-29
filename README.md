@@ -88,10 +88,15 @@ The output file names are automatically generated. Output files are named:
 <definition>_heatwaves_<modelname>_<experiment>_<ripcode>_<frequency>.nc
 ```
 definition = EHF/tx90pct/tn90pct
+
 modelname = String taken from the 'model_id' attribute in your input netCDF file.
+
 experiment = String taken from the 'parent_experiment_rip' attribute.
+
 ripcode = rXiXpX taken from 'realization', 'initialization_method' and ''physics_version' attributes.
+
 frequency = yearly/daily
+
 If your input dataset does not have any metadata about which model simulation
 it is, then the filename will just contain underscores. If you are running the
 program several times then make sure to rename the output files so they are not
