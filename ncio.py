@@ -260,7 +260,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     yearlyout.createDimension('lat', tempnc.dimensions[latvname].__len__())
     yearlyout.createDimension('day', timedata.daysinyear)
     setattr(yearlyout, "author", "Tammas Loughran")
-    setattr(yearlyout, "contact", "t.loughran@student.unsw.edu.au")
+    setattr(yearlyout, "contact", "t.loughran@unsw.edu.au")
     setattr(yearlyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(yearlyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(yearlyout, "script", sys.argv[0])
@@ -277,8 +277,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     setattr(yearlyout, "definition", definition)
     setattr(yearlyout, "frequency", "yearly")
     setattr(yearlyout, "season", options.season)
-    setattr(yearlyout, "season_note", ("The year of a season is the year it starts"
-            " in. SH summer: Nov-Mar. NH summer: May-Sep."))
+    setattr(yearlyout, "season_note", ("The year of a season is the year it starts in. SH summer: Nov-Mar. NH summer: May-Sep."))
     try:
         file = open('version', 'r')
         commit = file.read()[:]
@@ -291,15 +290,18 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     if options.maskfile:
         setattr(yearlyout, "mask_file", options.maskfile)
     setattr(yearlyout, "quantile_method", options.qtilemethod)
-    otime = yearlyout.createVariable('time', 'f8', 'time', fill_value=-999.99)
-    setattr(otime, 'units', 'year')
+    setattr(yearlyout, 'Conventions', 'CF-1.7')
+    otime = yearlyout.createVariable('time', 'f8', 'time')
+    setattr(otime, 'units', 'years since 0001-06-01 00:00:00')
+    setattr(otime, 'standard_name', 'time')
+    setattr(otime, 'calendar', 'proleptic_gregorian')
     olat = yearlyout.createVariable('lat', 'f8', 'lat')
     setattr(olat, 'standard_name', 'latitude')
     setattr(olat, 'long_name', 'Latitude')
     setattr(olat, 'units', 'degrees_north')
     setattr(olat, 'axis', 'Y')
     olon = yearlyout.createVariable('lon', 'f8', 'lon')
-    setattr(olon, 'standard_name', 'longiitude')
+    setattr(olon, 'standard_name', 'longitude')
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
     setattr(olon, 'axis', 'X')
@@ -319,15 +321,15 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     HWMout = yearlyout.createVariable('HWM_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
     setattr(HWMout, 'long_name', 'Heatwave Magnitude')
     if definition=='tx90pct':
-        setattr(HWAout, 'units', 'degC')
+        setattr(HWMout, 'units', 'degC')
     elif definition=='tn90pct':
-        setattr(HWAout, 'units', 'degC')
+        setattr(HWMout, 'units', 'degC')
     elif definition=='EHF':
-        setattr(HWAout, 'units', 'degC2')
+        setattr(HWMout, 'units', 'degC2')
     setattr(HWMout, 'description', 'Average magnitude of the yearly heatwave')
     HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8', ('time', 'lat', 'lon'), fill_value=-999.99)
     setattr(HWNout, 'long_name', 'Heatwave Number')
-    setattr(HWNout, 'units','heatwaves')
+    setattr(HWNout, 'units','count')
     setattr(HWNout, 'description', 'Number of heatwaves per year')
     HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
     setattr(HWFout, 'long_name','Heatwave Frequency')
@@ -339,9 +341,12 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
     HWTout = yearlyout.createVariable('HWT_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
     setattr(HWTout, 'long_name', 'Heatwave Timing')
-    setattr(HWTout, 'units', 'days from strat of season')
+    if options.season=='summer':
+        setattr(HWTout, 'units', 'days since 0001-11-01 00:00:00')
+    elif options.season=='winter':
+        setattr(HWTout, 'units', 'days since 0001-05-01 00:00:00')
     setattr(HWTout, 'description', 'First heat wave day of the season')
-    otime[:] = range(timedata.dayone.year, timedata.daylast.year+1)
+    otime[:] = range(timedata.dayone.year-1, timedata.daylast.year)
     olat[:] = tempnc.variables[latvname][:]
     olon[:] = tempnc.variables[lonvname][:]
     dummy_array = np.ones((timedata.daysinyear,)+(len(olat),)+(len(olon),))*np.nan
@@ -380,7 +385,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     yearlyout.close()
 
 
-def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
+def save_daily(exceed, event, ends, options, timedata, original_shape, mask, defn='EHF'):
     """save_daily saves the daily data to netcdf file.
     Input arrays are 2D, timeXspace and are either reshaped or indexed
     with a land-sea mask"""
@@ -414,15 +419,12 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
     lonnames = ('lon', 'lons', 'longitude', 'longitudes')
     lonkey = [vrbl in lonnames for vrbl in tempnc.variables.keys()].index(True)
     lonvname = list(tempnc.variables.keys())[lonkey]
-    if options.daily or options.dailyonly: defn ='EHF'
-    elif options.tx90pcd: defn = 'tx90pct'
-    elif options.tn90pcd: defn = 'tn90pct'
     dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'%(defn, model, experiment, rip), mode='w')
     dailyout.createDimension('time', size=None)
     dailyout.createDimension('lon', tempnc.dimensions[lonvname].__len__())
     dailyout.createDimension('lat', tempnc.dimensions[latvname].__len__())
     setattr(dailyout, "author", "Tammas Loughran")
-    setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
+    setattr(dailyout, "contact", "t.loughran@unsw.edu.au")
     setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(dailyout, "script", sys.argv[0])
@@ -450,9 +452,11 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
     if options.maskfile:
         setattr(dailyout, "mask_file", str(options.maskfile))
     setattr(dailyout, "quantile_method", options.qtilemethod)
-    otime = dailyout.createVariable('time', 'f8', 'time', fill_value=-999.99)
+    setattr(dailyout, 'Conventions', 'CF-1.7')
+    otime = dailyout.createVariable('time', 'f8', 'time')
     setattr(otime, 'units', 'days since %s-01-01'%(timedata.dayone.year))
-    setattr(otime, 'calendar', timedata.calendar)
+    setattr(otime, 'calendar', '365_day')
+    setattr(otime, 'standard_name', 'time')
     olat = dailyout.createVariable('lat', 'f8', 'lat')
     setattr(olat, 'standard_name', 'latitude')
     setattr(olat, 'long_name', 'Latitude')
@@ -462,7 +466,6 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask):
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
     oehf = dailyout.createVariable(defn, 'f8', ('time','lat','lon'), fill_value=-999.99)
-    setattr(oehf, 'standard_name', defn)
     if defn=='EHF':
         setattr(oehf, 'long_name', 'Excess Heat Factor')
         setattr(oehf, 'units', 'degC2')
@@ -536,13 +539,13 @@ def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
     lonnames = ('lon', 'lons', 'longitude', 'longitudes')
     lonkey = [vrbl in lonnames for vrbl in tempnc.variables.keys()].index(True)
     lonvname = list(tempnc.variables.keys())[lonkey]
-    defn ='EHI'
+    defn = 'EHI'
     dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'%(defn, model, experiment, rip), mode='w')
     dailyout.createDimension('time', size=None)
     dailyout.createDimension('lon', tempnc.dimensions[lonvname].__len__())
     dailyout.createDimension('lat', tempnc.dimensions[latvname].__len__())
     setattr(dailyout, "author", "Tammas Loughran")
-    setattr(dailyout, "contact", "t.loughran@student.unsw.edu.au")
+    setattr(dailyout, "contact", "t.loughran@unsw.edu.au")
     setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(dailyout, "script", sys.argv[0])
@@ -570,9 +573,11 @@ def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
     if options.maskfile:
         setattr(dailyout, "mask_file", str(options.maskfile))
     setattr(dailyout, "quantile_method", options.qtilemethod)
-    otime = dailyout.createVariable('time', 'f8', 'time', fill_value=-999.99)
+    setattr(dailyout, 'Conventions', 'CF-1.7')
+    otime = dailyout.createVariable('time', 'f8', 'time')
+    setattr(otime, 'standard_name', 'time')
     setattr(otime, 'units', 'days since %s-01-01'%(timedata.dayone.year))
-    setattr(otime, 'calendar', timedata.calendar)
+    setattr(otime, 'calendar', '365_day')
     olat = dailyout.createVariable('lat', 'f8', 'lat')
     setattr(olat, 'standard_name', 'latitude')
     setattr(olat, 'long_name', 'Latitude')
@@ -582,11 +587,9 @@ def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
     oehisig = dailyout.createVariable('EHIsig', 'f8', ('time','lat','lon'), fill_value=-999.99)
-    setattr(oehisig, 'standard_name', 'EHIsig')
     setattr(oehisig, 'long_name', 'Excess Heat Index Significance')
     setattr(oehisig, 'units', 'C')
     oehiaccl = dailyout.createVariable('EHIaccl', 'f8', ('time','lat','lon'), fill_value=-999.99)
-    setattr(oehiaccl, 'standard_name', 'EHIaccl')
     setattr(oehiaccl, 'long_name', 'Excess Heat Index Acclimatisation')
     setattr(oehisig, 'units', 'C')
     otime[:] = range(0,original_shape[0],1)

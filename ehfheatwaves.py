@@ -309,7 +309,7 @@ if __name__=='__main__':
     if options.keeptave:
         tave = (tmax + tmin)/2.
 
-    # Remove leap days from tave
+    # Remove leap days from data
     if (timedata.calendar=='gregorian')|(timedata.calendar=='proleptic_gregorian')|(timedata.calendar=='standard'):
         if options.keeptave:
             tave = tave[(timedata.dates.month!=2)|(timedata.dates.day!=29),...]
@@ -410,11 +410,11 @@ if __name__=='__main__':
     # Save daily data to netcdf
     if options.dailyout:
         if options.keeptave:
-            ncio.save_daily(EHF, event, ends, options, timedata, original_shape, mask)
+            ncio.save_daily(EHF, event, ends, options, timedata, original_shape, mask, defn='EHF')
         if options.tx90pcd:
-            ncio.save_daily(txexceed, event_tx, ends_tx, options, timedata, original_shape, mask)
+            ncio.save_daily(txexceed, event_tx, ends_tx, options, timedata, original_shape, mask, defn='tx90pct')
         if options.tn90pcd:
-            ncio.save_daily(tnexceed, event_tn, ends_tn, options, timedata, original_shape, mask)
+            ncio.save_daily(tnexceed, event_tn, ends_tn, options, timedata, original_shape, mask, defn='tn90pct')
 
     # save EHIs
     if options.ehi:
