@@ -200,7 +200,7 @@ def quantile_zhang_fast(x, q, fraction=False, rmnans=False):
     #  numpy uses indices j and j+1; quantile_zhang uses j-1 and j
     q_adj -= 1. * 100./(n - 1)
     # ensure q_adj is in 0..100.
-    assert (q_adj>=0.)&(q_adj<=100.), "q_adj is not within 0-100, q_adj=%s"%(q_adj)
+    q_adj = np.clip(q_adj, 0., 100.)
 
     return np.percentile(x, q_adj, axis=0)
 
