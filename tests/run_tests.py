@@ -327,9 +327,9 @@ class TestNCIO(unittest.TestCase):
         self.assertIs(type(timedata.dayone), dt.datetime)
         self.assertIs(type(timedata.daylast), dt.datetime)
 
-    def testLoadBPData(self):
-        """Should return a numpy array"""
-        self.assertIs(type(ncio.load_bp_data(self.options, self.timedata)), np.ndarray)
+    #def testLoadBPData(self):
+    #    """Should return a numpy array"""
+    #    self.assertIs(type(ncio.load_bp_data(self.options, self.timedata)), np.ndarray)
 
     def testGetAllData(self):
         """Should return two numpy arrays"""
