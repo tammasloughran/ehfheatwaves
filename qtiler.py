@@ -204,7 +204,6 @@ def quantile_zhang_fast(x, q, fraction=False, rmnans=False):
 
     return np.percentile(x, q_adj, axis=0)
 
-
 def quantile_climpact(y,p,fraction=False):
     """quantile function used by climpact.
 
@@ -214,6 +213,25 @@ def quantile_climpact(y,p,fraction=False):
     if not fraction:
         p = p/100.
     if (p>1) or (p<0): raise InvalidPercentileError(p)
+    y = np.array(y)
+    if y.ndim==1:
+        return qclimpact(y,p)
+    else:
+        spacedim = y.shape[1]
+        nodims = y.ndim
+        if nodims>2:
+            spacedim = np.array(y.shape)[1:].prod()
+            oldshape = y.shape[1:]
+            y = y.reshape(y.shape[0], spacedim)
+        Qp = np.ones(spacedim)*np.nan
+        for lat in range(spacedim):
+            if np.isnan(y[:,lat]).all(): continue
+            Qp[lat] = qclimpact(y[:,lat],p)
+        if nodims>2: Qp = Qp.reshape(oldshape)
+    return Qp
+
+def qclimpact(y,p):
+    y = y[np.logical_not(np.isnan(y))]
     n = y.shape[0]
     a, b = 1.0/3.0, 1.0/3.0
     nppm = a + p*(n + 1 - a - b) - 1
@@ -225,28 +243,11 @@ def quantile_climpact(y,p,fraction=False):
         h = nppm - j
     right_elem = max(0, min(int(j) + 1, n - 1))
     left_elem = max(0, min(int(j), n - 1))
-
-    def intrpl(left,right,h):
-        if h==1:
-            return right
-        elif h==0:
-            return left
-        else:
-            return (1 - h)*left + h*right
-
-    if y.ndim==1:
-        y = np.sort(y)
-        Qp = intrpl(y[left_elem],y[right_elem],h)
+    y = np.sort(y)
+    if h==1:
+        Qp = y[right_elem]
+    elif h==0:
+        Qp = y[left_elem]
     else:
-        spacedim = y.shape[1]
-        nodims = y.ndim
-        if nodims>2:
-            spacedim = np.array(y.shape)[1:].prod()
-            oldshape = y.shape[1:]
-            y = y.reshape(y.shape[0], spacedim)
-        Qp = np.ones(spacedim)*np.nan
-        for lat in range(spacedim):
-            array = np.sort(y[:,lat])
-            Qp[lat] = intrpl(array[left_elem],array[right_elem],h)
-        if nodims>2: Qp = Qp.reshape(oldshape)
+        Qp = (1 - h)*y[left_elem] + h*y[right_elem]
     return Qp

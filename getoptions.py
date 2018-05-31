@@ -64,6 +64,8 @@ def parse_arguments(arguments):
     parser.add_option('--noehf', action="store_true", dest='noehf', help='Supress EHF output and only use the specified t90pc')
     parser.add_option('-v', action="store_true", dest='verbose', help='Verbose')
     parser.add_option('--old-method', action="store_true", dest='oldmethod', help='Use the old definition of within-season heatwaves')
+    parser.add_option('--invert-mask', action='store_true', dest='invertmask', help='Invert the land-sea mask.')
+    parser.add_option('--flip-mask', action='store_true', dest='flipmask', help='Flip the mask upside down by latitude.')
 
     # Parse command line arguments to the options object
     options, args = parser.parse_args(arguments)

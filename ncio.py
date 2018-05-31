@@ -124,6 +124,8 @@ def get_mask(options):
     mask = mask.astype(np.bool)
     mask = np.squeeze(mask)
     masknc.close()
+    if options.invertmask: mask = np.logical_not(mask)
+    if options.flipmask: mask = np.flipud(mask)
     return mask
 
 
@@ -167,17 +169,7 @@ def load_bp_data(options, timedata, variable='tmax', mask=None):
     temp = tempnc.variables[varname][(options.bpstart<=bpdates.year)&(bpdates.year<=options.bpend)]
     if len(temp.shape)==4: temp = temp.squeeze()
 
-    # Test for increasing latitude and flip if decreasing
-    latnames = ('lat', 'lats', 'latitude', 'latitudes')
-    latkey = [vrbl in latnames for vrbl in tempnc.variables.keys()].index(True)
-    latvname = list(tempnc.variables.keys())[latkey]
-    lats = tempnc.variables[latvname][:]
-    increasing = (lats[0]-lats[-1])<0
-    if not increasing:
-        lats = np.flipud(lats)
-        temp = np.fliplr(temp)
     if options.maskfile:
-        if not increasing: mask = np.flipud(mask)
         temp = temp[:,mask]
 
     if tempnc.variables[varname].units=='K': temp -= 273.15
@@ -212,11 +204,7 @@ def get_all_data(files, vname, options):
     latkey = [vrbl in latnames for vrbl in tempnc.variables.keys()].index(True)
     latvname = list(tempnc.variables.keys())[latkey]
     lats = tempnc.variables[latvname][:]
-    increasing = (lats[0]-lats[-1])<0
-    if not increasing:
-        lats = np.flipud(lats)
-        temp = np.fliplr(temp)
-
+    if (lats[-1]-lats[0])<0: lats = np.flipud(lats)
     if tempnc.variables[vname].units=='K': temp -= 273.15
     tempnc.close()
     return temp, lats
@@ -230,7 +218,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
         tempnc = MFDataset(options.tmaxfile, 'r')
     else:
         tempnc = Dataset(options.tmaxfile, 'r')
-    nyears = len(range(timedata.dayone.year,timedata.daylast.year+1))
+    nyears = HWA.shape[0]
     try: experiment = tempnc.__getattribute__('experiment')
     except AttributeError: experiment = ''
     try: model = tempnc.__getattribute__('model_id')
@@ -346,7 +334,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     elif options.season=='winter':
         setattr(HWTout, 'units', 'days since 0001-05-01 00:00:00')
     setattr(HWTout, 'description', 'First heat wave day of the season')
-    otime[:] = range(timedata.dayone.year-1, timedata.daylast.year)
+    otime[:] = range(timedata.dayone.year, timedata.daylast.year)
     olat[:] = tempnc.variables[latvname][:]
     olon[:] = tempnc.variables[lonvname][:]
     dummy_array = np.ones((timedata.daysinyear,)+(len(olat),)+(len(olon),))*np.nan

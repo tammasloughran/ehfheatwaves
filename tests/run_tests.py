@@ -185,19 +185,19 @@ class TestIdentifyHW(unittest.TestCase):
     """Tests for the identify_hw function."""
 
     # Some example EHF index data
-    ehfdata = np.array([-1.3, -0.3, 3.4, 8.5, -0.4, # Not a heatwave
+    ehfdata = np.ma.array([-1.3, -0.3, 3.4, 8.5, -0.4, # Not a heatwave
                         5.6, 10.2, 20.4, -1.4, # a three day heatwave starting on day 6
                         7.8, 15.5, 16.9, 17.9, 30.2, -3.3]) # a 5 day heatwave starting on day 10
     ehfdata[ehfdata<0] = 0
-    known_events = np.array([0,0,0,0,0,1,1,1,0,1,1,1,1,1,0])
-    known_ends = np.array([0,0,0,0,0,3,0,0,0,5,0,0,0,0,0])
+    known_events = np.ma.array([0,0,0,0,0,1,1,1,0,1,1,1,1,1,0])
+    known_ends = np.ma.array([0,0,0,0,0,3,0,0,0,5,0,0,0,0,0])
 
     def testReturnTupple(self):
         """Should return a tupple containging the event indicator and the durations (numpy.ndarray)."""
         result = ehfheatwaves.identify_hw(self.ehfdata)
         self.assertIs(tuple, type(result))
-        self.assertIs(np.ndarray, type(result[0]))
-        self.assertIs(np.ndarray, type(result[1]))
+        self.assertIs(np.ma.core.MaskedArray, type(result[0]))
+        self.assertIs(np.ma.core.MaskedArray, type(result[1]))
 
     def testKnownEventsEnds(self):
         """Tests the known cases."""
@@ -217,19 +217,19 @@ class TestIdentifySemiHW(unittest.TestCase):
     """Tests for the identify_semi_hw function."""
 
     # Some example EHF index data
-    ehfdata = np.array([1.3, 0.3, -3.4, 8.5, -0.4, # 2 day heatwave
+    ehfdata = np.ma.array([1.3, 0.3, -3.4, 8.5, -0.4, # 2 day heatwave
                         5.6, 10.2, 20.4, -1.4, # a three day heatwave starting on day 6
                         7.8, 15.5, 16.9, 17.9, 30.2, -3.3]) # a 5 day heatwave starting on day 10
     ehfdata[ehfdata<0] = 0
-    known_events = np.array([0,0,0,0,0,1,1,1,0,1,1,1,1,1,0])
-    known_ends = np.array([0,0,0,0,0,3,0,0,0,5,0,0,0,0,0])
+    known_events = np.ma.array([0,0,0,0,0,1,1,1,0,1,1,1,1,1,0])
+    known_ends = np.ma.array([0,0,0,0,0,3,0,0,0,5,0,0,0,0,0])
 
     def testReturnTupple(self):
         """Should return a tupple containging the event indicator and the durations (numpy.ndarrays)."""
         result = ehfheatwaves.identify_hw(self.ehfdata)
         self.assertIs(tuple, type(result))
-        self.assertIs(np.ndarray, type(result[0]))
-        self.assertIs(np.ndarray, type(result[1]))
+        self.assertIs(np.ma.core.MaskedArray, type(result[0]))
+        self.assertIs(np.ma.core.MaskedArray, type(result[1]))
 
     def testKnownEventsEnds(self):
         """Tests the known cases."""
@@ -380,6 +380,9 @@ if __name__=='__main__':
 
     # Load the comparison data
     chwdata = np.load('hwdata.npy')
+    for i in range(0,6):
+        # The old data is upside down
+        thwdata[i,...] = np.fliplr(thwdata[i,...])
 
     # Take the difference between the test and comparison data
     difference = abs(thwdata - chwdata)
