@@ -24,7 +24,7 @@ if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
 import qtiler
 import getoptions
 import ncio
-
+import pdb
 
 def window_percentile(temp, options, daysinyear=365, wsize=15):
     """window_percentile calculates a day-of-year moving window percentile."""
@@ -69,7 +69,7 @@ def identify_hw(ehfs):
     # Agregate consecutive days with EHF>0
     # First day contains duration
     events = (ehfs>0.).astype(np.int)
-    events[ehfs.mask==True] = 0
+    events[np.isnan(ehfs)] = 0
     for i in range(events.shape[0]-2,-1,-1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
 
@@ -102,7 +102,7 @@ def identify_semi_hw(ehfs):
     # Agregate consecutive days with EHF>0
     # First day contains duration
     events = (ehfs>0.).astype(np.int)
-    events[ehfs.mask==True] = 0
+    events[np.isnan(ehfs)] = 0
     for i in range(events.shape[0]-2,-1,-1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
 
