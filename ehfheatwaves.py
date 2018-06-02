@@ -24,12 +24,18 @@ if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
 import qtiler
 import getoptions
 import ncio
-import pdb
+
+
+# define vales for missing values, invalid values and fill values.
+missingval = -999.99
+fillval = -888.88
+invalidval = -777.77
+
 
 def window_percentile(temp, options, daysinyear=365, wsize=15):
     """window_percentile calculates a day-of-year moving window percentile."""
     # Initialise array.
-    pctl = np.ones(((daysinyear,)+temp.shape[1:]))*np.nan
+    pctl = np.ones(((daysinyear,)+temp.shape[1:]))*fillval
 
     # Construct the window.
     window = np.zeros(daysinyear,dtype=np.bool)
@@ -53,12 +59,15 @@ def window_percentile(temp, options, daysinyear=365, wsize=15):
 
     # Set the percentile for each day of year.
     for day in range(daysinyear):
-        sys.stdout.write("\r")
-        sys.stdout.write(str(day))
-        sys.stdout.flush()
+        #sys.stdout.write("\r")
+        #sys.stdout.write(str(day))
+        #sys.stdout.flush()
         pctl[day,...] = percentile(temp[window,...], options.pcntl, parameter)
         window = np.roll(window,1)
-
+    
+    # Remaining nans are missing data.
+    pctl[np.isnan(pctl)] = missingval
+    
     return pctl
 
 
@@ -69,13 +78,13 @@ def identify_hw(ehfs):
     # Agregate consecutive days with EHF>0
     # First day contains duration
     events = (ehfs>0.).astype(np.int)
-    events[np.isnan(ehfs)] = 0
+    events[events.mask==True] = 0
     for i in range(events.shape[0]-2,-1,-1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
 
     # Identify when heatwaves start with duration
     # Given that first day contains duration
-    diff = np.ma.zeros(events.shape)
+    diff = np.zeros(events.shape)
     # Insert the first diff value as np.diff doesn't catch it because
     # there is no pevious value to compare to.
     diff[0,...] = events[0,...]
@@ -102,13 +111,13 @@ def identify_semi_hw(ehfs):
     # Agregate consecutive days with EHF>0
     # First day contains duration
     events = (ehfs>0.).astype(np.int)
-    events[np.isnan(ehfs)] = 0
+    events[events.mask==True] = 0
     for i in range(events.shape[0]-2,-1,-1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
 
     # Identify when heatwaves start with duration
     # Given that first day contains duration
-    diff = np.ma.zeros(events.shape)
+    diff = np.zeros(events.shape)
     # Insert the first diff value as np.diff doesn't catch it because
     # there is no pevious value to compare to.
     diff[0,...] = events[0,...]
@@ -142,7 +151,7 @@ def hw_aspects(EHF, season, hemisphere):
             startday = timedata.SHS[0]
             endday = timedata.SHS[1]
     # Initialize arrays
-    HWA = np.ones(((nyears,)+(EHF.shape[1],)))*np.nan
+    HWA = np.ones(((nyears,)+(EHF.shape[1],)))*fillval
     HWM = HWA.copy()
     HWN = HWA.copy()
     HWF = HWA.copy()
@@ -191,8 +200,6 @@ def hw_aspects(EHF, season, hemisphere):
         HWF[iyear,...] = duration_i.sum(axis=0)
         HWD[iyear,...] = duration_i.max(axis=0)
         HWT[iyear,...] = np.argmax(event_i,axis=0)
-        HWT[iyear,HWD[iyear,...]==0] = np.nan
-        HWD[iyear,HWD[iyear,...]==0] = np.nan
         # HWM and HWA must be done on each gridcell
         for x in range(EHF_i.shape[1]):
             hw_mag = []
@@ -209,6 +216,20 @@ def hw_aspects(EHF, season, hemisphere):
             idex = np.where(hw_mag==max(hw_mag))[0][0]
             # Find that heatwave's hottest day as EHF value.
             HWA[iyear,x] = EHF_i[i[idex]:i[idex]+d[idex],x].max()
+        # Locate invalid values or misisng values
+        missing = EHF_i.mask.all(axis=0)
+        if missing.any():
+            HWT[iyear,missing] = missingval
+            HWN[iyear,missing] = missingval
+            HWF[iyear,missing] = missingval
+            HWD[iyear,missing] = missingval
+            HWA[iyear,missing] = missingval
+            HWM[iyear,missing] = missingval
+        invalid = HWN[iyear,...]==0
+        HWT[iyear,invalid] = invalidval
+        HWD[iyear,invalid] = invalidval
+        HWA[iyear,invalid] = invalidval
+        HWM[iyear,invalid] = invalidval
     return HWA, HWM, HWN, HWF, HWD, HWT
 
 
@@ -361,8 +382,8 @@ if __name__=='__main__':
             EHF[i,...] = np.ma.maximum(EHIaccl,1.)*EHIsig
         EHF[EHF<0] = 0
     if options.ehi:
-        EHIaccl = np.ones(tave.shape)*np.nan
-        EHIsig = np.ones(tave.shape)*np.nan
+        EHIaccl = np.ma.ones(tave.shape)*np.nan
+        EHIsig = np.ma.ones(tave.shape)*np.nan
         for i in range(32,tave.shape[0]):
             EHIaccl[i,...] = tave[i-2:i+1,...].sum(axis=0)/3. - tave[i-32:i-2,...].sum(axis=0)/30.
             EHIsig[i,...] = tave[i-2:i+1,...].sum(axis=0)/3. - tpct[i-timedata.daysinyear*int((i+1)/timedata.daysinyear),...]
@@ -370,20 +391,20 @@ if __name__=='__main__':
     # Tx90pc exceedences
     if options.keeptmin or options.keeptmax:
         if options.keeptmax:
-            txexceed = np.ones(tmax.shape)*np.nan
+            txexceed = np.ma.ones(tmax.shape)*np.nan
             for i in range(0,tmax.shape[0]):
                 idoy = i-timedata.daysinyear*int((i+1)/timedata.daysinyear)
                 txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
             txexceed[txexceed>0] = tmax[txexceed>0]
         if options.keeptmin:
-            tnexceed = np.ones(tmin.shape)*np.nan
+            tnexceed = np.ma.ones(tmin.shape)*np.nan
             for i in range(0,tmin.shape[0]):
                 idoy = i-timedata.daysinyear*int((i+1)/timedata.daysinyear)
                 tnexceed[i,...] = tmin[i,...]>tnpct[idoy,...]
             tnexceed[tnexceed>0] = tmin[tnexceed>0]
 
     # Calculate daily output
-    if options.daily: event, ends = identify_hw(EHF)
+    if options.dailyout or options.dailyout: event, ends = identify_hw(EHF)
     if options.tx90pcd: event_tx, ends_tx = identify_hw(txexceed)
     if options.tn90pcd: event_tn, ends_tn = identify_hw(tnexceed)
 

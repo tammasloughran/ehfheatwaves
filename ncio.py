@@ -20,6 +20,11 @@ except ImportError:
 import numpy as np
 
 
+# define fill value and missing values
+missingval = -999.99 # for missing data
+fillval = -888.88 # for land-sea masked gridpoints
+
+
 class DatesOrderError(Exception):
     """Exception to be raised when the calendar start day occurs before the end day"""
 
@@ -293,11 +298,13 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
     setattr(olon, 'axis', 'X')
-    otpct = yearlyout.createVariable('t%spct'%(options.pcntl), 'f8', ('day','lat','lon'), fill_value=-999.99)
+    otpct = yearlyout.createVariable('t%spct'%(options.pcntl), 'f8', ('day','lat','lon'), fill_value=fillval)
     setattr(otpct, 'long_name', '90th percentile')
     setattr(otpct, 'units', 'degC')
     setattr(otpct, 'description', '90th percentile of %s-%s'%(str(options.bpstart),str(options.bpend)))
-    HWAout = yearlyout.createVariable('HWA_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
+    setattr(otpct, 'missing_value', missingval)
+    setattr(otpct, 'valid_range', (-20,100))
+    HWAout = yearlyout.createVariable('HWA_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(HWAout, 'long_name', 'Heatwave Amplitude')
     if definition=='tx90pct':
         setattr(HWAout, 'units', 'degC')
@@ -306,7 +313,9 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     elif definition=='EHF':
         setattr(HWAout, 'units', 'degC2')
     setattr(HWAout, 'description', 'Peak of the hottest heatwave per year')
-    HWMout = yearlyout.createVariable('HWM_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
+    setattr(HWAout, 'missing_value', missingval)
+    setattr(HWAout, 'valid_range', (-30, 400))
+    HWMout = yearlyout.createVariable('HWM_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(HWMout, 'long_name', 'Heatwave Magnitude')
     if definition=='tx90pct':
         setattr(HWMout, 'units', 'degC')
@@ -315,51 +324,59 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     elif definition=='EHF':
         setattr(HWMout, 'units', 'degC2')
     setattr(HWMout, 'description', 'Average magnitude of the yearly heatwave')
-    HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8', ('time', 'lat', 'lon'), fill_value=-999.99)
+    setattr(HWMout, 'missing_value', missingval)
+    setattr(HWMout, 'valid_range' ,(-30, 400))
+    HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8', ('time', 'lat', 'lon'), fill_value=fillval)
     setattr(HWNout, 'long_name', 'Heatwave Number')
     setattr(HWNout, 'units','count')
     setattr(HWNout, 'description', 'Number of heatwaves per year')
-    HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
+    setattr(HWNout, 'missing_value', missingval)
+    setattr(HWNout, 'valid_range', (0, 40))
+    HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(HWFout, 'long_name','Heatwave Frequency')
     setattr(HWFout, 'units', 'days')
     setattr(HWFout, 'description', 'Proportion of heatwave days per season')
-    HWDout = yearlyout.createVariable('HWD_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
+    setattr(HWFout, 'misisng_value', missingval)
+    setattr(HWFout, 'valid_range', (0, 165))
+    HWDout = yearlyout.createVariable('HWD_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(HWDout, 'long_name', 'Heatwave Duration')
     setattr(HWDout, 'units', 'days')
     setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
-    HWTout = yearlyout.createVariable('HWT_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=-999.99)
+    setattr(HWDout, 'missing_value', missingval)
+    setattr(HWDout, 'valid_range', (0,165))
+    HWTout = yearlyout.createVariable('HWT_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(HWTout, 'long_name', 'Heatwave Timing')
     if options.season=='summer':
         setattr(HWTout, 'units', 'days since 0001-11-01 00:00:00')
     elif options.season=='winter':
         setattr(HWTout, 'units', 'days since 0001-05-01 00:00:00')
     setattr(HWTout, 'description', 'First heat wave day of the season')
+    setattr(HWTout, 'missing_value', missingval)
+    setattr(HWTout, 'valid_range', (1,366))
     otime[:] = range(timedata.dayone.year, timedata.daylast.year)
     olat[:] = tempnc.variables[latvname][:]
     olon[:] = tempnc.variables[lonvname][:]
-    dummy_array = np.ones((timedata.daysinyear,)+(len(olat),)+(len(olon),))*np.nan
     if options.maskfile:
+        dummy_array = np.ones((timedata.daysinyear,)+(len(olat),)+(len(olon),))*fillval
         dummy_array[:,mask] = tpct
-        dummy_array[np.isnan(dummy_array)] = -999.99
         otpct[:] = dummy_array.copy()
-        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*np.nan
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
         dummy_array[:,mask] = HWA
-        dummy_array[np.isnan(dummy_array)] = -999.99
         HWAout[:] = dummy_array.copy()
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
         dummy_array[:,mask] = HWM
-        dummy_array[np.isnan(dummy_array)] = -999.99
         HWMout[:] = dummy_array.copy()
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
         dummy_array[:,mask] = HWN
-        dummy_array[np.isnan(dummy_array)] = -999.99
         HWNout[:] = dummy_array.copy()
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
         dummy_array[:,mask] = HWF
-        dummy_array[np.isnan(dummy_array)] = -999.99
         HWFout[:] = dummy_array.copy()
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
         dummy_array[:,mask] = HWD
-        dummy_array[np.isnan(dummy_array)] = -999.99
         HWDout[:] = dummy_array.copy()
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
         dummy_array[:,mask] = HWT
-        dummy_array[np.isnan(dummy_array)] = -999.99
         HWTout[:] = dummy_array.copy()
     else:
         otpct[:] = tpct
@@ -453,7 +470,7 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask, def
     setattr(olon, 'standard_name', 'longitude')
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
-    oehf = dailyout.createVariable(defn, 'f8', ('time','lat','lon'), fill_value=-999.99)
+    oehf = dailyout.createVariable(defn, 'f8', ('time','lat','lon'), fill_value=fillval)
     if defn=='EHF':
         setattr(oehf, 'long_name', 'Excess Heat Factor')
         setattr(oehf, 'units', 'degC2')
@@ -463,27 +480,27 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask, def
     elif defn=='tn90pct':
         setattr(oehf, 'long_name', 'Temperature Exceeding tn90pct')
         setattr(oehf, 'units', 'C')
-    oevent = dailyout.createVariable('event', 'f8', ('time','lat','lon'), fill_value=-999.99)
+    oevent = dailyout.createVariable('event', 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(oevent, 'long_name', 'Event indicator')
     setattr(oevent, 'description', 'Indicates whether a heatwave is happening on that day')
-    oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'), fill_value=-999.99)
+    oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(oends, 'long_name', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
     otime[:] = range(0,original_shape[0],1)
     olat[:] = tempnc.variables[latvname][:]
     olon[:] = tempnc.variables[lonvname][:]
+    event[:31,...] = missingval
+    ends[:31,...] = missingval
+    exceed[exceed.mask==True] = missingval
     if options.maskfile:
-        dummy_array = np.ones(original_shape)*np.nan
+        dummy_array = np.ones(original_shape)*fillval
         dummy_array[:,mask] = exceed
-        dummy_array[np.isnan(dummy_array)] = -999.99
         oehf[:] = dummy_array.copy()
+        dummy_array = np.ones(original_shape)*fillval
         dummy_array[:,mask] = event
-        dummy_array[np.isnan(dummy_array)] = -999.99
-        dummy_array[:31,...] = -999.99
         oevent[:] = dummy_array.copy()
+        dummy_array = np.ones(original_shape)*fillval
         dummy_array[:,mask] = ends
-        dummy_array[np.isnan(dummy_array)] = -999.99
-        dummy_array[:31,...] = -999.99
         oends[:] = dummy_array.copy()
     else:
         oehf[:] = exceed
@@ -574,23 +591,27 @@ def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
     setattr(olon, 'standard_name', 'longitude')
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
-    oehisig = dailyout.createVariable('EHIsig', 'f8', ('time','lat','lon'), fill_value=-999.99)
+    oehisig = dailyout.createVariable('EHIsig', 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(oehisig, 'long_name', 'Excess Heat Index Significance')
     setattr(oehisig, 'units', 'C')
-    oehiaccl = dailyout.createVariable('EHIaccl', 'f8', ('time','lat','lon'), fill_value=-999.99)
+    setattr(oehisig, 'missing_value', missingval)
+    setattr(oehisig, 'valid_range', (0,100))
+    oehiaccl = dailyout.createVariable('EHIaccl', 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(oehiaccl, 'long_name', 'Excess Heat Index Acclimatisation')
-    setattr(oehisig, 'units', 'C')
+    setattr(oehiaccl, 'units', 'C')
+    setattr(oehiaccl, 'missing_value', missingval)
+    setattr(oehiaccl, 'valid_range', (0,100))
     otime[:] = range(0,original_shape[0],1)
     olat[:] = tempnc.variables[latvname][:]
     olon[:] = tempnc.variables[lonvname][:]
+    EHIsig[:31,...] = missingval
+    EHIaccl[:31,...] = missingval
     if options.maskfile:
-        dummy_array = np.ones(original_shape)*np.nan
+        dummy_array = np.ones(original_shape)*fillval
         dummy_array[:,mask] = EHIsig
-        dummy_array[np.isnan(dummy_array)] = -999.99
         oehisig[:] = dummy_array.copy()
+        dummy_array = np.ones(original_shape)*fillval
         dummy_array[:,mask] = EHIaccl
-        dummy_array[np.isnan(dummy_array)] = -999.99
-        dummy_array[:31,...] = -999.99
         oehiaccl[:] = dummy_array.copy()
     else:
         oehisig[:] = EHIsig

@@ -204,6 +204,7 @@ def quantile_zhang_fast(x, q, fraction=False, rmnans=False):
 
     return np.percentile(x, q_adj, axis=0)
 
+
 def quantile_climpact(y,p,fraction=False):
     """quantile function used by climpact.
 
@@ -229,6 +230,7 @@ def quantile_climpact(y,p,fraction=False):
             Qp[lat] = qclimpact(y[:,lat],p)
         if nodims>2: Qp = Qp.reshape(oldshape)
     return Qp
+
 
 def qclimpact(y,p):
     y = y[np.logical_not(np.isnan(y))]
