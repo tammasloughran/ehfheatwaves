@@ -336,7 +336,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     setattr(HWFout, 'long_name','Heatwave Frequency')
     setattr(HWFout, 'units', 'days')
     setattr(HWFout, 'description', 'Proportion of heatwave days per season')
-    setattr(HWFout, 'misisng_value', missingval)
+    setattr(HWFout, 'missing_value', missingval)
     setattr(HWFout, 'valid_range', (0, 165))
     HWDout = yearlyout.createVariable('HWD_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(HWDout, 'long_name', 'Heatwave Duration')
@@ -480,12 +480,15 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask, def
     elif defn=='tn90pct':
         setattr(oehf, 'long_name', 'Temperature Exceeding tn90pct')
         setattr(oehf, 'units', 'C')
+    setattr(oehf, 'missing_value', missingval)
     oevent = dailyout.createVariable('event', 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(oevent, 'long_name', 'Event indicator')
     setattr(oevent, 'description', 'Indicates whether a heatwave is happening on that day')
+    setattr(oevent, 'missing_value', missingval)
     oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'), fill_value=fillval)
     setattr(oends, 'long_name', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
+    setattr(oends, 'missing_value', missingval)
     otime[:] = range(0,original_shape[0],1)
     olat[:] = tempnc.variables[latvname][:]
     olon[:] = tempnc.variables[lonvname][:]
