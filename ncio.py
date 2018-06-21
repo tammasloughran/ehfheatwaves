@@ -492,8 +492,6 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask, def
     otime[:] = range(0,original_shape[0],1)
     olat[:] = tempnc.variables[latvname][:]
     olon[:] = tempnc.variables[lonvname][:]
-    event[:31,...] = missingval
-    ends[:31,...] = missingval
     exceed[exceed.mask==True] = missingval
     if options.maskfile:
         dummy_array = np.ones(original_shape)*fillval
@@ -607,8 +605,6 @@ def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
     otime[:] = range(0,original_shape[0],1)
     olat[:] = tempnc.variables[latvname][:]
     olon[:] = tempnc.variables[lonvname][:]
-    EHIsig[:31,...] = missingval
-    EHIaccl[:31,...] = missingval
     if options.maskfile:
         dummy_array = np.ones(original_shape)*fillval
         dummy_array[:,mask] = EHIsig
