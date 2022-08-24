@@ -64,10 +64,10 @@ def window_percentile(temp, options, daysinyear=365, wsize=15):
         #sys.stdout.flush()
         pctl[day,...] = percentile(temp[window,...], options.pcntl, parameter)
         window = np.roll(window,1)
-    
+
     # Remaining nans are missing data.
     pctl[np.isnan(pctl)] = missingval
-    
+
     return pctl
 
 
@@ -362,7 +362,7 @@ if __name__=='__main__':
         if options.keeptmin:
             tmin = tmin[start:,...]
             original_shape = (tmin.shape[0], original_shape[1], original_shape[2])
-    
+
     # Apply mask
     if options.maskfile:
         if options.keeptave:
@@ -422,7 +422,7 @@ if __name__=='__main__':
             HWA_tx, HWM_tx, HWN_tx, HWF_tx, HWD_tx, HWT_tx = split_hemispheres(txexceed)
         if options.tn90pc:
             HWA_tn, HWM_tn, HWN_tn, HWF_tn, HWD_tn, HWT_tn = split_hemispheres(tnexceed)
-        
+
     if options.verbose: print("Saving")
     # Save yearly data to netcdf
     if options.yearlyout:
@@ -445,3 +445,4 @@ if __name__=='__main__':
     # save EHIs
     if options.ehi:
         ncio.save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask)
+
