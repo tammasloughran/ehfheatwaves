@@ -84,7 +84,7 @@ tx90pc or tn90pc indices then you may only provide the relevant data for each.
 Specifying a land sea mask is optional, using the -m argument, but recommended.
 Multiple files can be specified using wildcards, use quotes when doing so. e.g.
 ```
-python ehfheatwaves.py -x "/direcory/tasmax_\*" -n "/direcory/tasmin_*" -m "/direcory/mask.nc" -d
+ehfheatwaves -x "/direcory/tasmax_\*" -n "/direcory/tasmin_*" -m "/direcory/mask.nc" -d
 ```
 
 Be careful when using the -d flag. This writes daily output of EHF values
@@ -133,4 +133,3 @@ days are 0.
 
 To do list:
  * Use standard metadata conventions
-
