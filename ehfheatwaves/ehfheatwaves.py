@@ -293,8 +293,7 @@ def split_hemispheres(EHF):
     return HWA, HWM, HWN, HWF, HWD, HWT
 
 
-if __name__=='__main__':
-
+def main():
     # Get the options and variables
     options = getoptions.parse_arguments(sys.argv[1:])
 
