@@ -171,7 +171,14 @@ def load_bp_data(options, timedata, variable='tmax', mask=None):
         if timedata.calendar=='365_day': bpdates = bpdates[(bpdates.month!=2)|(bpdates.day!=29)]
         dates_base = bpdates[(options.bpstart<=bpdates.year)&(bpdates.year<=options.bpend)]
 
-    temp = tempnc.variables[varname][(options.bpstart<=bpdates.year)&(bpdates.year<=options.bpend)]
+    try:
+        temp = tempnc.variables[varname][(options.bpstart<=bpdates.year)&(bpdates.year<=options.bpend)]
+    except IndexError as FirstException:
+        raise IndexError(
+                "Could not index netCDF file time dimension. This could be a calendar problem."
+                "Please make sure your input file is daily frequency data and/or that it contains"
+                "the base period."
+                ) from FirstExcetion
     if len(temp.shape)==4: temp = temp.squeeze()
 
     if options.maskfile:
