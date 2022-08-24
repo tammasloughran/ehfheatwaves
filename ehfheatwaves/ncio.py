@@ -8,21 +8,15 @@ Created on Sat Apr 14 12:56:42 2018
 """
 import sys
 import datetime as dt
-try:
-    modulename = 'netCDF4'
-    import netCDF4 as nc
-    from netCDF4 import MFDataset, MFTime, Dataset
-    modulename = 'pandas'
-    import pandas as pd
-except ImportError:
-    print(modulename, " is missing. Please install missing packages.")
-    sys.exit(2)
+import netCDF4 as nc
+from netCDF4 import MFDataset, MFTime, Dataset
+import pandas as pd
 import numpy as np
 
-
-# define fill value and missing values
+# define fill value and missing values. These should be put in a module.
 missingval = -999.99 # for missing data
 fillval = -888.88 # for land-sea masked gridpoints
+invalidval = -777.77
 
 
 class DatesOrderError(Exception):

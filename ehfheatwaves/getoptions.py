@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
 getoptions.py parses the command line arguments to an options object.
@@ -7,15 +6,11 @@ Created on Fri Apr 13 21:58:40 2018
 
 @author: Tammas Loughran
 """
-
 import sys
 import warnings
-try:
-    modulename = 'optparse'
-    from optparse import OptionParser
-except ImportError:
-    print(modulename, " is missing. Please install missing packages.")
-    sys.exit(2)
+from optparse import OptionParser
+
+options = None
 
 
 class NoTmaxTminFileError(Exception):
