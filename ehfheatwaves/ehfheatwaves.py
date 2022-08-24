@@ -21,9 +21,9 @@ except ImportError:
 if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
     print("Please install numpy version 1.8.0 or higher.")
     sys.exit(2)
-import qtiler
-import getoptions
-import ncio
+import ehfheatwaves.qtiler as qtiler
+import ehfheatwaves.getoptions as getoptions
+import ehfheatwaves.ncio as ncio
 
 
 # define vales for missing values, invalid values and fill values.
