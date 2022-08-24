@@ -16,8 +16,25 @@ heatwave indicators for any season rather than just annual or seasonal
 heatwave aspects. The script has since been expanded and improved to handle
 CMIP5 quirks (such different calendars), and use alternative heatwave indices.
 
+## Installation
+
+Optionaly set up a virtualenv:
 ```
-Usage: ehfheatwaves.py -x <FILE> -n <FILE> [options]
+virtualenv heatwave_env
+source heatwave_env/bin/activate
+```
+
+Install:
+```
+git clone https://github.com/tammasloughran/ehfheatwaves
+cd ehfheatwaves
+pip install .
+```
+
+## Usage
+
+```
+Usage: ehfheatwaves -x <FILE> -n <FILE> [options]
 
 Options:
   -h, --help            show this help message and exit
@@ -51,16 +68,7 @@ Options:
   --old-method          Use the old definition of within-season heatwaves
 ```
 
-Required packages (prefereably the latest versions)
- * numpy
- * pandas
- * netCDF4
-You can install them with:
-```
-pip install --user numpy pandas netCDF4
-```
-
-Notes:
+## Notes
 
 If you publish any research or other work that used this software, PLEASE cite
 myself and this github repository in the acknowledgments section of your
@@ -125,3 +133,4 @@ days are 0.
 
 To do list:
  * Use standard metadata conventions
+
