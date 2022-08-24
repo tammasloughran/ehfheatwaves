@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 ehfheatwaves.py calculates heatwave indices and characteristics from
@@ -6,25 +5,13 @@ temperature data.
 
 @author: Tammas Loughran
 """
-
 import sys
 import warnings
 warnings.simplefilter('ignore',category=RuntimeWarning)
-try:
-    modulename = 'numpy'
-    import numpy as np
-    modulename = 'distutils.version'
-    from distutils.version import LooseVersion
-except ImportError:
-    print(modulename, " is missing. Please install missing packages.")
-    sys.exit(2)
-if LooseVersion(np.__version__) < LooseVersion('1.8.0'):
-    print("Please install numpy version 1.8.0 or higher.")
-    sys.exit(2)
+import numpy as np
 import ehfheatwaves.qtiler as qtiler
 import ehfheatwaves.getoptions as getoptions
 import ehfheatwaves.ncio as ncio
-
 
 # define vales for missing values, invalid values and fill values.
 missingval = -999.99
@@ -59,9 +46,6 @@ def window_percentile(temp, options, daysinyear=365, wsize=15):
 
     # Set the percentile for each day of year.
     for day in range(daysinyear):
-        #sys.stdout.write("\r")
-        #sys.stdout.write(str(day))
-        #sys.stdout.flush()
         pctl[day,...] = percentile(temp[window,...], options.pcntl, parameter)
         window = np.roll(window,1)
 
@@ -294,6 +278,14 @@ def split_hemispheres(EHF):
 
 
 def main():
+    """Main function that is called by the entry point script.
+
+    See the following documentation for more information on entry points.
+    https://setuptools.pypa.io/en/latest/userguide/entry_point.html?highlight=entry
+
+    This function parses the cammand line arguments and options then calculates the heatwaves and
+    saves them to netcdf files.
+    """
     # Get the options and variables
     options = getoptions.parse_arguments(sys.argv[1:])
 
