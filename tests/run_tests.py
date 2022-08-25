@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 run_tests.py tests the accuracy of ehfheatwaves.py compared to heatwave data
@@ -6,23 +6,20 @@ calculated by climpact2 R package, and runs some unit tests.
 
 @author: Tammas Loughran
 """
-
-# Load modules
-import os
-import netCDF4 as nc
-import sys
-sys.path.append('../')
-import warnings
-warnings.simplefilter('ignore',category=RuntimeWarning)
-import numpy as np
 import datetime as dt
-import unittest
-import ehfheatwaves
 import optparse
-import getoptions
-import qtiler
-import ncio
+import os
+import sys
+import unittest
+import warnings
 
+import netCDF4 as nc
+import numpy as np
+
+from ehfheatwaves import ehfheatwaves, getoptions, ncio, qtiler
+
+warnings.simplefilter('ignore',category=RuntimeWarning)
+sys.path.append('../')
 
 class TestRQtiler(unittest.TestCase):
     """Test the R based quantile function."""
@@ -324,8 +321,9 @@ class TestNCIO(unittest.TestCase):
         timedata = ncio.get_time_data(self.options)
         print(timedata.calendar)
         self.assertTrue(timedata.calendar in ['standard', '360_day', 'gregorian', 'proleptic_gregorian', '365_day'])
-        self.assertIs(type(timedata.dayone), dt.datetime)
-        self.assertIs(type(timedata.daylast), dt.datetime)
+        import cftime
+        self.assertIn(type(timedata.dayone), [dt.datetime, cftime.DatetimeGregorian])
+        self.assertIn(type(timedata.daylast), [dt.datetime, cftime.DatetimeGregorian])
 
     #def testLoadBPData(self):
     #    """Should return a numpy array"""
@@ -342,9 +340,9 @@ if __name__=='__main__':
     # Test the script as a whole against climpact2 data.
     # Define command and arguments
     if sys.version[0]=='3':
-        run_comnd = 'python3 ../ehfheatwaves.py'
+        run_comnd = 'ehfheatwaves'
     else:
-        run_comnd = 'python ../ehfheatwaves.py'
+        run_comnd = 'python ../ehfheatwaves/ehfheatwaves.py'
     arguments = ' -x climpact2.sampledata.gridded.1991-2010.nc' \
         ' -n climpact2.sampledata.gridded.1991-2010.nc' \
         ' --vnamex=tmax' \
