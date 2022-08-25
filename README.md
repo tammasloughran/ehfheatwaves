@@ -1,8 +1,8 @@
 # ehfheatwaves
 A tool to calculate heatwaves from gridded daily datasets.
 
-[![DOI](https://zenodo.org/badge/41076341.svg)](https://zenodo.org/badge/latestdoi/41076341)
 ![tests](https://github.com/tammasloughran/ehfheatwaves/actions/workflows/actions.yaml/badge.svg)
+[![DOI](https://zenodo.org/badge/41076341.svg)](https://zenodo.org/badge/latestdoi/41076341)
 
 
 The default definition of a heatwave is any hot event of at least three days
