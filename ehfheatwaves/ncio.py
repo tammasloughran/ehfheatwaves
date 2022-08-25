@@ -12,6 +12,7 @@ import netCDF4 as nc
 from netCDF4 import MFDataset, MFTime, Dataset
 import pandas as pd
 import numpy as np
+from ehfheatwaves import __version__
 
 # define fill value and missing values. These should be put in a module.
 missingval = -999.99 # for missing data
@@ -272,13 +273,7 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     setattr(yearlyout, "frequency", "yearly")
     setattr(yearlyout, "season", options.season)
     setattr(yearlyout, "season_note", ("The year of a season is the year it starts in. SH summer: Nov-Mar. NH summer: May-Sep."))
-    try:
-        file = open('version', 'r')
-        commit = file.read()[:]
-        if commit[-2:]==r'\n': commit = commit[:-2]
-    except IOError:
-        commit = "Unknown. Check date for latest version."
-    setattr(yearlyout, "git_commit", commit)
+    setattr(yearlyout, "version", __version__)
     setattr(yearlyout, "tmax_file", options.tmaxfile)
     setattr(yearlyout, "tmin_file", options.tminfile)
     if options.maskfile:
@@ -444,13 +439,7 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask, def
         setattr(dailyout, "realization", realization)
         setattr(dailyout, "initialization_method", initialization)
         setattr(dailyout, "physics_version", physics)
-    try:
-        file = open('version', 'r')
-        commit = file.read()[:]
-        if commit[-2:]==r'\n': commit = commit[:-2]
-    except IOError:
-        commit = "Unknown. Check date for latest version."
-    setattr(dailyout, "git_commit", commit)
+    setattr(dailyout, "version", __version__)
     if options.tmaxfile:
         setattr(dailyout, "tmax_file", options.tmaxfile)
     if options.tminfile:
@@ -566,13 +555,7 @@ def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
         setattr(dailyout, "realization", realization)
         setattr(dailyout, "initialization_method", initialization)
         setattr(dailyout, "physics_version", physics)
-    try:
-        file = open('version', 'r')
-        commit = file.read()[:]
-        if commit[-2:]==r'\n': commit = commit[:-2]
-    except IOError:
-        commit = "Unknown. Check date for latest version."
-    setattr(dailyout, "git_commit", commit)
+    setattr(dailyout, "version", __version__)
     if options.tmaxfile:
         setattr(dailyout, "tmax_file", options.tmaxfile)
     if options.tminfile:
