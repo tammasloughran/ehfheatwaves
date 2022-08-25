@@ -19,6 +19,7 @@ jobs:
       - name: Build
         run: |
           cd ehfheatwaves
+          ls .
           pip install .
       - name: Test
         run: |
