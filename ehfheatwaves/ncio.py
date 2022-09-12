@@ -121,6 +121,7 @@ def get_mask(options):
     masknc = Dataset(options.maskfile, 'r')
     mask = masknc.variables[options.maskvname][:]
     if mask.max()>1: mask = mask>50
+    else: mask = mask>0.5
     mask = mask.astype(np.bool)
     mask = np.squeeze(mask)
     masknc.close()
