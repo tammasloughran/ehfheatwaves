@@ -12,7 +12,7 @@ import netCDF4 as nc
 from netCDF4 import MFDataset, MFTime, Dataset
 import pandas as pd
 import numpy as np
-from ehfheatwaves import __version__
+from ehfheatwaves.__init__ import __version__
 
 # define fill value and missing values. These should be put in a module.
 missingval = -999.99 # for missing data
