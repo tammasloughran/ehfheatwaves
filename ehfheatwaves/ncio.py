@@ -171,10 +171,11 @@ def load_bp_data(options, timedata, variable='tmax', mask=None):
         temp = tempnc.variables[varname][(options.bpstart<=bpdates.year)&(bpdates.year<=options.bpend)]
     except IndexError as FirstException:
         raise IndexError(
-                "Could not index netCDF file time dimension. This could be a calendar problem."
-                "Please make sure your input file is daily frequency data and/or that it contains"
-                "the base period."
-                ) from FirstExcetion
+                "Could not index netCDF file time dimension. This could be a calendar problem. "
+                "Please make sure your input file is daily frequency data and/or that it contains "
+                f"the base period. You wanted {options.bpstart}-{options.bpend} and your data have "
+                f"{bpdates.year[0]}-{bpdates.year[-1]}"
+                ) from FirstException
     if len(temp.shape)==4: temp = temp.squeeze()
 
     if options.maskfile:
