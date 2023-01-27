@@ -34,8 +34,8 @@ def window_percentile(temp, options, daysinyear=365, wsize=15):
 
     # Construct the window.
     window = np.zeros(daysinyear, dtype=bool)
-    window[-np.int(np.floor(wsize/2.)):] = 1
-    window[:np.int(np.ceil(wsize/2.))] = 1
+    window[-np.floor(wsize/2.).astype(int):] = 1
+    window[:np.ceil(wsize/2.).astype(int)] = 1
     window = np.tile(window, options.bpend + 1 - options.bpstart)
 
     # Select the interpolation method.
