@@ -105,7 +105,7 @@ def identify_semi_hw(ehfs):
     events = (ehfs>0.).astype(np.int)
     events[events.mask==True] = 0
     for i in range(events.shape[0]-2,-1,-1):
-         events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
+         events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1/home/lou059/envs/dev-fallback/lib/python3.8/site-packages/ehfheatwaves/ehfheatwaves.py
 
     # Identify when heatwaves start with duration
     # Given that first day contains duration
@@ -297,7 +297,7 @@ def main():
     This function parses the cammand line arguments and options then calculates the heatwaves and
     saves them to netcdf files.
     """
-    global grid, timedata
+    global grid, timedata, mask
     # Get the options and variables
     getoptions.options = getoptions.parse_arguments(sys.argv[1:])
     options = getoptions.options
