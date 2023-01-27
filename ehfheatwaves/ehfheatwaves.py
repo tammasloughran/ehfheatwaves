@@ -33,10 +33,10 @@ def window_percentile(temp, options, daysinyear=365, wsize=15):
     pctl = np.ones(((daysinyear,)+temp.shape[1:]))*fillval
 
     # Construct the window.
-    window = np.zeros(daysinyear,dtype=np.bool)
+    window = np.zeros(daysinyear, dtype=bool)
     window[-np.int(np.floor(wsize/2.)):] = 1
     window[:np.int(np.ceil(wsize/2.))] = 1
-    window = np.tile(window,options.bpend+1-options.bpstart)
+    window = np.tile(window, options.bpend + 1 - options.bpstart)
 
     # Select the interpolation method.
     if options.qtilemethod=='python':
@@ -69,7 +69,7 @@ def identify_hw(ehfs):
     """
     # Agregate consecutive days with EHF>0
     # First day contains duration
-    events = (ehfs>0.).astype(np.int)
+    events = (ehfs>0.).astype(int)
     events[events.mask==True] = 0
     for i in range(events.shape[0]-2,-1,-1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
@@ -81,7 +81,7 @@ def identify_hw(ehfs):
     # there is no pevious value to compare to.
     diff[0,...] = events[0,...]
     diff[1:,...] = np.diff(events, axis=0)
-    endss = np.ma.zeros(ehfs.shape,dtype=np.int)
+    endss = np.ma.zeros(ehfs.shape,dtype=int)
     endss[diff>2] = events[diff>2]
 
     # Remove events less than 3 days
@@ -90,7 +90,7 @@ def identify_hw(ehfs):
     events[diff==1] = 0
     del diff
     events[events>0] = 1
-    events = events.astype(np.bool)
+    events = events.astype(bool)
     endss[endss<3] = 0
     return events, endss
 
@@ -102,7 +102,7 @@ def identify_semi_hw(ehfs):
     """
     # Agregate consecutive days with EHF>0
     # First day contains duration
-    events = (ehfs>0.).astype(np.int)
+    events = (ehfs>0.).astype(int)
     events[events.mask==True] = 0
     for i in range(events.shape[0]-2,-1,-1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
@@ -114,11 +114,11 @@ def identify_semi_hw(ehfs):
     # there is no pevious value to compare to.
     diff[0,...] = events[0,...]
     diff[1:,...] = np.diff(events, axis=0)
-    endss = np.ma.zeros(ehfs.shape,dtype=np.int)
+    endss = np.ma.zeros(ehfs.shape,dtype=int)
     endss[diff>0] = events[diff>0]
     del diff
     events[events>0] = 1
-    events = events.astype(np.bool)
+    events = events.astype(bool)
     return events, endss
 
 
