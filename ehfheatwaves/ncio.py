@@ -9,19 +9,17 @@ Created on Sat Apr 14 12:56:42 2018
 import sys
 import datetime as dt
 import netCDF4 as nc
-from netCDF4 import MFDataset, MFTime, Dataset
 import pandas as pd
 import numpy as np
 from ehfheatwaves.__init__ import __version__
+import ehfheatwaves.constants as const
 
-# define fill value and missing values. These should be put in a module.
-missingval = -999.99 # for missing data
-fillval = -888.88 # for land-sea masked gridpoints
-invalidval = -777.77
+LAT_NAMES = ('lat','lats','latitude','latitudes')
+LON_NAMES = ('lon','lons','longitude','longitudes')
 
 
 class DatesOrderError(Exception):
-    """Exception to be raised when the calendar start day occurs before the end day"""
+    """Exception to be raised when the calendar start day occurs before the end day."""
 
     def __init__(self, start, end):
         self.start = start
@@ -32,7 +30,7 @@ class DatesOrderError(Exception):
 
 
 class Calendar360():
-    """Creates a basic calendar object with 360 days per year."""
+    """A basic calendar object with 360 days per year."""
 
     def __init__(self,sdate,edate):
         if sdate>edate: raise DatesOrderError(sdate,edate)
@@ -73,11 +71,11 @@ def get_time_data(options):
     elif options.tminfile:
         filename = options.tminfile
     if any([(wildcard in filename) for wildcard in ['*','?','[']]):
-        tempnc = MFDataset(filename, 'r')
+        tempnc = nc.MFDataset(filename, 'r')
         nctime = tempnc.variables[options.timevname]
-        nctime = MFTime(nctime)
+        nctime = nc.MFTime(nctime)
     else:
-        tempnc = Dataset(filename, 'r')
+        tempnc = nc.Dataset(filename, 'r')
         nctime = tempnc.variables[options.timevname]
     try:
         timedata.calendar = nctime.calendar
@@ -118,7 +116,7 @@ def get_time_data(options):
 
 def get_mask(options):
     """get_mask loads the land-sea mask data from a NetCDF4 file."""
-    masknc = Dataset(options.maskfile, 'r')
+    masknc = nc.Dataset(options.maskfile, 'r')
     mask = masknc.variables[options.maskvname][:]
     if mask.max()>1: mask = mask>50
     else: mask = mask>0.5
@@ -144,11 +142,11 @@ def load_bp_data(options, timedata, variable='tmax', mask=None):
 
     # Load ncfile depending on multi or single-file
     if any([(wildcard in files) for wildcard in ['*','?','[']]):
-        tempnc = MFDataset(files, 'r')
+        tempnc = nc.MFDataset(files, 'r')
         bptime = tempnc.variables[options.timevname]
         bptime = MFTime(bptime)
     else:
-        tempnc = Dataset(files,'r')
+        tempnc = nc.Dataset(files,'r')
         bptime = tempnc.variables[options.timevname]
 
     # Define the base period
@@ -201,16 +199,16 @@ def get_all_data(files, vname, options):
 
     Returns
     temp - data in (time, x, y) coordinates.
-    lats - latitudes"""
+    lats - latitudes
+    """
     if any([(wildcard in files) for wildcard in ['*','?','[']]):
-        tempnc = MFDataset(files, 'r')
+        tempnc = nc.MFDataset(files, 'r')
     else:
-        tempnc = Dataset(files, 'r')
+        tempnc = nc.Dataset(files, 'r')
     temp = tempnc.variables[vname][:]
     if len(temp.shape)==4: temp = temp.squeeze()
     # Test for increasing latitude and flip if decreasing
-    latnames = ('lat', 'lats', 'latitude', 'latitudes')
-    latkey = [vrbl in latnames for vrbl in tempnc.variables.keys()].index(True)
+    latkey = [vrbl in LAT_NAMES for vrbl in tempnc.variables.keys()].index(True)
     latvname = list(tempnc.variables.keys())[latkey]
     lats = tempnc.variables[latvname][:]
     if (lats[-1]-lats[0])<0: lats = np.flipud(lats)
@@ -222,11 +220,12 @@ def get_all_data(files, vname, options):
 def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     """Save yearly data to netcdf file.
     Input aspect arrays are 2D, timeXspace and are either reshaped or indexed
-    with a land-sea mask"""
+    with a land-sea mask
+    """
     if any([(wildcard in options.tmaxfile) for wildcard in ['*','?','[']]):
-        tempnc = MFDataset(options.tmaxfile, 'r')
+        tempnc = nc.MFDataset(options.tmaxfile, 'r')
     else:
-        tempnc = Dataset(options.tmaxfile, 'r')
+        tempnc = nc.Dataset(options.tmaxfile, 'r')
     nyears = HWA.shape[0]
     try: experiment = tempnc.__getattribute__('experiment')
     except AttributeError: experiment = ''
@@ -244,14 +243,12 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     except AttributeError:
         physics = ''
         rip = ''
-    latnames = ('lat', 'lats', 'latitude', 'latitudes')
-    latkey = [vrbl in latnames for vrbl in tempnc.variables.keys()].index(True)
+    latkey = [vrbl in LAT_NAMES for vrbl in tempnc.variables.keys()].index(True)
     latvname = list(tempnc.variables.keys())[latkey]
-    lonnames = ('lon', 'lons', 'longitude', 'longitudes')
-    lonkey = [vrbl in lonnames for vrbl in tempnc.variables.keys()].index(True)
+    lonkey = [vrbl in LON_NAMES for vrbl in tempnc.variables.keys()].index(True)
     lonvname = list(tempnc.variables.keys())[lonkey]
     space = (tempnc.dimensions[latvname].__len__(), tempnc.dimensions[lonvname].__len__())
-    yearlyout = Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, model, experiment, rip, options.season), 'w')
+    yearlyout = nc.Dataset('%s_heatwaves_%s_%s_%s_yearly_%s.nc'%(definition, model, experiment, rip, options.season), 'w')
     yearlyout.createDimension('time', size=None)
     yearlyout.createDimension('lon', tempnc.dimensions[lonvname].__len__())
     yearlyout.createDimension('lat', tempnc.dimensions[latvname].__len__())
@@ -296,13 +293,13 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
     setattr(olon, 'axis', 'X')
-    otpct = yearlyout.createVariable('t%spct'%(options.pcntl), 'f8', ('day','lat','lon'), fill_value=fillval)
+    otpct = yearlyout.createVariable('t%spct'%(options.pcntl), 'f8', ('day','lat','lon'), fill_value=const.FILL_VAL)
     setattr(otpct, 'long_name', '90th percentile')
     setattr(otpct, 'units', 'degC')
     setattr(otpct, 'description', '90th percentile of %s-%s'%(str(options.bpstart),str(options.bpend)))
-    setattr(otpct, 'missing_value', missingval)
+    setattr(otpct, 'missing_value', const.MISSING_VAL)
     setattr(otpct, 'valid_range', (-20,100))
-    HWAout = yearlyout.createVariable('HWA_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=fillval)
+    HWAout = yearlyout.createVariable('HWA_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=const.FILL_VAL)
     setattr(HWAout, 'long_name', 'Heatwave Amplitude')
     if definition=='tx90pct':
         setattr(HWAout, 'units', 'degC')
@@ -311,9 +308,9 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     elif definition=='EHF':
         setattr(HWAout, 'units', 'degC2')
     setattr(HWAout, 'description', 'Peak of the hottest heatwave per year')
-    setattr(HWAout, 'missing_value', missingval)
+    setattr(HWAout, 'missing_value', const.MISSING_VAL)
     setattr(HWAout, 'valid_range', (-30, 400))
-    HWMout = yearlyout.createVariable('HWM_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=fillval)
+    HWMout = yearlyout.createVariable('HWM_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=const.FILL_VAL)
     setattr(HWMout, 'long_name', 'Heatwave Magnitude')
     if definition=='tx90pct':
         setattr(HWMout, 'units', 'degC')
@@ -322,58 +319,58 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     elif definition=='EHF':
         setattr(HWMout, 'units', 'degC2')
     setattr(HWMout, 'description', 'Average magnitude of the yearly heatwave')
-    setattr(HWMout, 'missing_value', missingval)
+    setattr(HWMout, 'missing_value', const.MISSING_VAL)
     setattr(HWMout, 'valid_range' ,(-30, 400))
-    HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8', ('time', 'lat', 'lon'), fill_value=fillval)
+    HWNout = yearlyout.createVariable('HWN_%s'%(definition), 'f8', ('time', 'lat', 'lon'), fill_value=const.FILL_VAL)
     setattr(HWNout, 'long_name', 'Heatwave Number')
     setattr(HWNout, 'units','count')
     setattr(HWNout, 'description', 'Number of heatwaves per year')
-    setattr(HWNout, 'missing_value', missingval)
+    setattr(HWNout, 'missing_value', const.MISSING_VAL)
     setattr(HWNout, 'valid_range', (0, 40))
-    HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=fillval)
+    HWFout = yearlyout.createVariable('HWF_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=const.FILL_VAL)
     setattr(HWFout, 'long_name','Heatwave Frequency')
     setattr(HWFout, 'units', 'days')
     setattr(HWFout, 'description', 'Proportion of heatwave days per season')
-    setattr(HWFout, 'missing_value', missingval)
+    setattr(HWFout, 'missing_value', const.MISSING_VAL)
     setattr(HWFout, 'valid_range', (0, 165))
-    HWDout = yearlyout.createVariable('HWD_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=fillval)
+    HWDout = yearlyout.createVariable('HWD_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=const.FILL_VAL)
     setattr(HWDout, 'long_name', 'Heatwave Duration')
     setattr(HWDout, 'units', 'days')
     setattr(HWDout, 'description', 'Duration of the longest heatwave per year')
-    setattr(HWDout, 'missing_value', missingval)
+    setattr(HWDout, 'missing_value', const.MISSING_VAL)
     setattr(HWDout, 'valid_range', (0,165))
-    HWTout = yearlyout.createVariable('HWT_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=fillval)
+    HWTout = yearlyout.createVariable('HWT_%s'%(definition), 'f8', ('time','lat','lon'), fill_value=const.FILL_VAL)
     setattr(HWTout, 'long_name', 'Heatwave Timing')
     if options.season=='summer':
         setattr(HWTout, 'units', 'days since 0001-11-01 00:00:00')
     elif options.season=='winter':
         setattr(HWTout, 'units', 'days since 0001-05-01 00:00:00')
     setattr(HWTout, 'description', 'First heat wave day of the season')
-    setattr(HWTout, 'missing_value', missingval)
+    setattr(HWTout, 'missing_value', const.MISSING_VAL)
     setattr(HWTout, 'valid_range', (1,366))
     otime[:] = range(timedata.dayone.year, timedata.daylast.year)
     olat[:] = tempnc.variables[latvname][:]
     olon[:] = tempnc.variables[lonvname][:]
     if options.maskfile:
-        dummy_array = np.ones((timedata.daysinyear,)+(len(olat),)+(len(olon),))*fillval
+        dummy_array = np.ones((timedata.daysinyear,)+(len(olat),)+(len(olon),))*const.FILL_VAL
         dummy_array[:,mask] = tpct
         otpct[:] = dummy_array.copy()
-        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*const.FILL_VAL
         dummy_array[:,mask] = HWA
         HWAout[:] = dummy_array.copy()
-        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*const.FILL_VAL
         dummy_array[:,mask] = HWM
         HWMout[:] = dummy_array.copy()
-        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*const.FILL_VAL
         dummy_array[:,mask] = HWN
         HWNout[:] = dummy_array.copy()
-        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*const.FILL_VAL
         dummy_array[:,mask] = HWF
         HWFout[:] = dummy_array.copy()
-        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*const.FILL_VAL
         dummy_array[:,mask] = HWD
         HWDout[:] = dummy_array.copy()
-        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*fillval
+        dummy_array = np.ones((nyears,)+(len(olat),)+(len(olon),))*const.FILL_VAL
         dummy_array[:,mask] = HWT
         HWTout[:] = dummy_array.copy()
     else:
@@ -391,13 +388,14 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
 def save_daily(exceed, event, ends, options, timedata, original_shape, mask, defn='EHF'):
     """save_daily saves the daily data to netcdf file.
     Input arrays are 2D, timeXspace and are either reshaped or indexed
-    with a land-sea mask"""
+    with a land-sea mask
+    """
     if options.tmaxfile:
         filename = options.tmaxfile
     elif options.tminfile:
         filename = options.tminfile
     if any([(wildcard in filename) for wildcard in ['*','?','[']]):
-        tempnc = MFDataset(filename, 'r')
+        tempnc = nc.MFDataset(filename, 'r')
     else:
         tempnc = Dataset(filename, 'r')
     try: experiment = tempnc.__getattribute__('experiment')
@@ -416,13 +414,11 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask, def
     except AttributeError:
         physics = ''
         rip = ''
-    latnames = ('lat', 'lats', 'latitude', 'latitudes')
-    latkey = [vrbl in latnames for vrbl in tempnc.variables.keys()].index(True)
+    latkey = [vrbl in LAT_NAMES for vrbl in tempnc.variables.keys()].index(True)
     latvname = list(tempnc.variables.keys())[latkey]
-    lonnames = ('lon', 'lons', 'longitude', 'longitudes')
-    lonkey = [vrbl in lonnames for vrbl in tempnc.variables.keys()].index(True)
+    lonkey = [vrbl in LON_NAMES for vrbl in tempnc.variables.keys()].index(True)
     lonvname = list(tempnc.variables.keys())[lonkey]
-    dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'%(defn, model, experiment, rip), mode='w')
+    dailyout = nc.Dataset('%s_heatwaves_%s_%s_%s_daily.nc'%(defn, model, experiment, rip), mode='w')
     dailyout.createDimension('time', size=None)
     dailyout.createDimension('lon', tempnc.dimensions[lonvname].__len__())
     dailyout.createDimension('lat', tempnc.dimensions[latvname].__len__())
@@ -431,8 +427,8 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask, def
     setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(dailyout, "script", sys.argv[0])
-    setattr(dailyout, "period", "%s-%s"%(str(timedata.dayone.year),str(timedata.daylast.year)))
-    setattr(dailyout, "base_period", "%s-%s"%(str(options.bpstart),str(options.bpend)))
+    setattr(dailyout, "period", "%s-%s"%(str(timedata.dayone.year), str(timedata.daylast.year)))
+    setattr(dailyout, "base_period", "%s-%s"%(str(options.bpstart), str(options.bpend)))
     setattr(dailyout, "percentile", "%sth"%(str(options.pcntl)))
     if model:
         setattr(dailyout, "model_id", model)
@@ -462,7 +458,7 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask, def
     setattr(olon, 'standard_name', 'longitude')
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
-    oehf = dailyout.createVariable(defn, 'f8', ('time','lat','lon'), fill_value=fillval)
+    oehf = dailyout.createVariable(defn, 'f8', ('time','lat','lon'), fill_value=const.FILL_VAL)
     if defn=='EHF':
         setattr(oehf, 'long_name', 'Excess Heat Factor')
         setattr(oehf, 'units', 'degC2')
@@ -472,27 +468,27 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask, def
     elif defn=='tn90pct':
         setattr(oehf, 'long_name', 'Temperature Exceeding tn90pct')
         setattr(oehf, 'units', 'C')
-    setattr(oehf, 'missing_value', missingval)
-    oevent = dailyout.createVariable('event', 'f8', ('time','lat','lon'), fill_value=fillval)
+    setattr(oehf, 'missing_value', const.MISSING_VAL)
+    oevent = dailyout.createVariable('event', 'f8', ('time','lat','lon'), fill_value=const.FILL_VAL)
     setattr(oevent, 'long_name', 'Event indicator')
     setattr(oevent, 'description', 'Indicates whether a heatwave is happening on that day')
-    setattr(oevent, 'missing_value', missingval)
-    oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'), fill_value=fillval)
+    setattr(oevent, 'missing_value', const.MISSING_VAL)
+    oends = dailyout.createVariable('ends', 'f8', ('time','lat','lon'), fill_value=const.FILL_VAL)
     setattr(oends, 'long_name', 'Duration at start of heatwave')
     setattr(oends, 'units', 'days')
-    setattr(oends, 'missing_value', missingval)
+    setattr(oends, 'missing_value', const.MISSING_VAL)
     otime[:] = range(0,original_shape[0],1)
     olat[:] = tempnc.variables[latvname][:]
     olon[:] = tempnc.variables[lonvname][:]
-    exceed[exceed.mask==True] = missingval
+    exceed[exceed.mask==True] = const.MISSING_VAL
     if options.maskfile:
-        dummy_array = np.ones(original_shape)*fillval
+        dummy_array = np.ones(original_shape)*const.FILL_VAL
         dummy_array[:,mask] = exceed
         oehf[:] = dummy_array.copy()
-        dummy_array = np.ones(original_shape)*fillval
+        dummy_array = np.ones(original_shape)*const.FILL_VAL
         dummy_array[:,mask] = event
         oevent[:] = dummy_array.copy()
-        dummy_array = np.ones(original_shape)*fillval
+        dummy_array = np.ones(original_shape)*const.FILL_VAL
         dummy_array[:,mask] = ends
         oends[:] = dummy_array.copy()
     else:
@@ -506,15 +502,16 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask, def
 def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
     """save_ehi saves the daily data to netcdf file.
     Input arrays are 2D, timeXspace and are either reshaped or indexed
-    with a land-sea mask"""
+    with a land-sea mask
+    """
     if options.tmaxfile:
         filename = options.tmaxfile
     elif options.tminfile:
         filename = options.tminfile
     if any([(wildcard in filename) for wildcard in ['*','?','[']]):
-        tempnc = MFDataset(filename, 'r')
+        tempnc = nc.MFDataset(filename, 'r')
     else:
-        tempnc = Dataset(filename, 'r')
+        tempnc = nc.Dataset(filename, 'r')
     try: experiment = tempnc.__getattribute__('experiment')
     except AttributeError: experiment = ''
     try: model = tempnc.__getattribute__('model_id')
@@ -531,14 +528,12 @@ def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
     except AttributeError:
         physics = ''
         rip = ''
-    latnames = ('lat', 'lats', 'latitude', 'latitudes')
-    latkey = [vrbl in latnames for vrbl in tempnc.variables.keys()].index(True)
+    latkey = [vrbl in LAT_NAMES for vrbl in tempnc.variables.keys()].index(True)
     latvname = list(tempnc.variables.keys())[latkey]
-    lonnames = ('lon', 'lons', 'longitude', 'longitudes')
-    lonkey = [vrbl in lonnames for vrbl in tempnc.variables.keys()].index(True)
+    lonkey = [vrbl in LON_NAMES for vrbl in tempnc.variables.keys()].index(True)
     lonvname = list(tempnc.variables.keys())[lonkey]
     defn = 'EHI'
-    dailyout = Dataset('%s_heatwaves_%s_%s_%s_daily.nc'%(defn, model, experiment, rip), mode='w')
+    dailyout = nc.Dataset('%s_heatwaves_%s_%s_%s_daily.nc'%(defn, model, experiment, rip), mode='w')
     dailyout.createDimension('time', size=None)
     dailyout.createDimension('lon', tempnc.dimensions[lonvname].__len__())
     dailyout.createDimension('lat', tempnc.dimensions[latvname].__len__())
@@ -547,8 +542,8 @@ def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
     setattr(dailyout, "source", "https://github.com/tammasloughran/ehfheatwaves")
     setattr(dailyout, "date", dt.datetime.today().strftime('%Y-%m-%d'))
     setattr(dailyout, "script", sys.argv[0])
-    setattr(dailyout, "period", "%s-%s"%(str(timedata.dayone.year),str(timedata.daylast.year)))
-    setattr(dailyout, "base_period", "%s-%s"%(str(options.bpstart),str(options.bpend)))
+    setattr(dailyout, "period", "%s-%s"%(str(timedata.dayone.year), str(timedata.daylast.year)))
+    setattr(dailyout, "base_period", "%s-%s"%(str(options.bpstart), str(options.bpend)))
     setattr(dailyout, "percentile", "%sth"%(str(options.pcntl)))
     if model:
         setattr(dailyout, "model_id", model)
@@ -578,24 +573,34 @@ def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
     setattr(olon, 'standard_name', 'longitude')
     setattr(olon, 'long_name', 'Longitude')
     setattr(olon, 'units', 'degrees_east')
-    oehisig = dailyout.createVariable('EHIsig', 'f8', ('time','lat','lon'), fill_value=fillval)
+    oehisig = dailyout.createVariable(
+            'EHIsig',
+            'f8',
+            ('time','lat','lon'),
+            fill_value=const.FILL_VAL,
+            )
     setattr(oehisig, 'long_name', 'Excess Heat Index Significance')
     setattr(oehisig, 'units', 'C')
-    setattr(oehisig, 'missing_value', missingval)
+    setattr(oehisig, 'missing_value', const.MISSING_VAL)
     setattr(oehisig, 'valid_range', (0,100))
-    oehiaccl = dailyout.createVariable('EHIaccl', 'f8', ('time','lat','lon'), fill_value=fillval)
+    oehiaccl = dailyout.createVariable(
+            'EHIaccl',
+            'f8',
+            ('time','lat','lon'),
+            fill_value=const.FILL_VAL,
+            )
     setattr(oehiaccl, 'long_name', 'Excess Heat Index Acclimatisation')
     setattr(oehiaccl, 'units', 'C')
-    setattr(oehiaccl, 'missing_value', missingval)
+    setattr(oehiaccl, 'missing_value', const.MISSING_VAL)
     setattr(oehiaccl, 'valid_range', (0,100))
-    otime[:] = range(0,original_shape[0],1)
+    otime[:] = range(0, original_shape[0], 1)
     olat[:] = tempnc.variables[latvname][:]
     olon[:] = tempnc.variables[lonvname][:]
     if options.maskfile:
-        dummy_array = np.ones(original_shape)*fillval
+        dummy_array = np.ones(original_shape)*const.FILL_VAL
         dummy_array[:,mask] = EHIsig
         oehisig[:] = dummy_array.copy()
-        dummy_array = np.ones(original_shape)*fillval
+        dummy_array = np.ones(original_shape)*const.FILL_VAL
         dummy_array[:,mask] = EHIaccl
         oehiaccl[:] = dummy_array.copy()
     else:

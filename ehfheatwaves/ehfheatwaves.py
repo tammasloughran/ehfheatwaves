@@ -1,22 +1,19 @@
 # -*- coding: utf-8 -*-
-"""
-ehfheatwaves.py calculates heatwave indices and characteristics from
-temperature data.
+"""Calculate heatwave indices and characteristics from temperature data.
 
 @author: Tammas Loughran
 """
 import sys
 import warnings
-warnings.simplefilter('ignore',category=RuntimeWarning)
 import numpy as np
 import ehfheatwaves.getoptions as getoptions
 import ehfheatwaves.qtiler as qtiler
 import ehfheatwaves.ncio as ncio
+import ehfheatwaves.constants as const
+from ehfheatwaves.getoptions import options
 
-# define vales for missing values, invalid values and fill values. These should be put in a module
-missingval = -999.99
-fillval = -888.88
-invalidval = -777.77
+warnings.simplefilter('ignore', category=RuntimeWarning)
+
 
 class GridDescription(object):
     lats = np.array([])
@@ -26,11 +23,16 @@ grid = GridDescription()
 timedata = ncio.TimeData()
 
 
-def window_percentile(temp, options, daysinyear=365, wsize=15):
-    """window_percentile calculates a day-of-year moving window percentile."""
-    from ehfheatwaves.getoptions import options
+def window_percentile(temp, daysinyear=365, wsize=15):
+    """Calculate a day-of-year moving window percentile.
+
+    Arguments:
+    temp -- Temperature data.
+    daysinyear -- Number of days in a year.
+    wsize -- Number of days in moving window.
+    """
     # Initialise array.
-    pctl = np.ones(((daysinyear,)+temp.shape[1:]))*fillval
+    pctl = np.ones(((daysinyear,)+temp.shape[1:]))*const.FILL_VAL
 
     # Construct the window.
     window = np.zeros(daysinyear, dtype=bool)
@@ -55,23 +57,29 @@ def window_percentile(temp, options, daysinyear=365, wsize=15):
     # Set the percentile for each day of year.
     for day in range(daysinyear):
         pctl[day,...] = percentile(temp[window,...], options.pcntl, parameter)
-        window = np.roll(window,1)
+        window = np.roll(window, 1)
 
     # Remaining nans are missing data.
-    pctl[np.isnan(pctl)] = missingval
+    pctl[np.isnan(pctl)] = const.MISSING_VAL
 
     return pctl
 
 
 def identify_hw(ehfs):
-    """identify_hw locates heatwaves from EHF and returns an event indicator
-    and a duration indicator.
+    """Locate heatwaves from EHF and returns an event indicator and a duration indicator.
+
+    Arguments:
+    ehfs -- EHF values.
+
+    Returns
+    events -- array of bools for heatwave events.
+    endss -- array of integers for heatwave duration.
     """
     # Agregate consecutive days with EHF>0
     # First day contains duration
     events = (ehfs>0.).astype(int)
     events[events.mask==True] = 0
-    for i in range(events.shape[0]-2,-1,-1):
+    for i in range(events.shape[0] - 2, -1, -1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
 
     # Identify when heatwaves start with duration
@@ -81,7 +89,7 @@ def identify_hw(ehfs):
     # there is no pevious value to compare to.
     diff[0,...] = events[0,...]
     diff[1:,...] = np.diff(events, axis=0)
-    endss = np.ma.zeros(ehfs.shape,dtype=int)
+    endss = np.ma.zeros(ehfs.shape, dtype=int)
     endss[diff>2] = events[diff>2]
 
     # Remove events less than 3 days
@@ -96,15 +104,21 @@ def identify_hw(ehfs):
 
 
 def identify_semi_hw(ehfs):
-    """identify_hw locates heatwaves from EHF and returns an event indicator
-    and a duration indicator. This function does not exclude events less than
-    three days in duration.
+    """identify_hw locates heatwaves from EHF and returns an event indicator and a duration
+    indicator. This function does not exclude events less than three days in duration.
+
+    Arguments:
+    ehfs -- EHF values.
+
+    Returns
+    events -- array of bools for heatwave events.
+    endss -- array of integers for heatwave duration.
     """
     # Agregate consecutive days with EHF>0
     # First day contains duration
     events = (ehfs>0.).astype(int)
     events[events.mask==True] = 0
-    for i in range(events.shape[0]-2,-1,-1):
+    for i in range(events.shape[0] - 2, -1, -1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
 
     # Identify when heatwaves start with duration
@@ -114,7 +128,7 @@ def identify_semi_hw(ehfs):
     # there is no pevious value to compare to.
     diff[0,...] = events[0,...]
     diff[1:,...] = np.diff(events, axis=0)
-    endss = np.ma.zeros(ehfs.shape,dtype=int)
+    endss = np.ma.zeros(ehfs.shape, dtype=int)
     endss[diff>0] = events[diff>0]
     del diff
     events[events>0] = 1
@@ -123,10 +137,21 @@ def identify_semi_hw(ehfs):
 
 
 def hw_aspects(EHF, season, hemisphere):
-    """hw_aspects takes EHF values or temp 90pct exceedences identifies
-    heatwaves and calculates seasonal aspects.
+    """Call `identify_hw` and calculate seasonal aspects.
+
+    Arguments:
+    EHF -- EHF values.
+    season -- The season in which to calculate aspects for.
+    hemisphere -- The hemisphere to calculate heatwaves for.
+
+    Returns
+    HWA -- Amplitude
+    HWM -- Magnitude
+    HWN -- Number
+    HWF -- Frequency
+    HWD -- Maximum duration
+    HWT -- Timing
     """
-    from ehfheatwaves.getoptions import options
     global timedata
     # Select indices depending on calendar season and hemisphere
     if season=='summer':
@@ -144,14 +169,14 @@ def hw_aspects(EHF, season, hemisphere):
             startday = timedata.SHS[0]
             endday = timedata.SHS[1]
     # Initialize arrays
-    HWA = np.ones(((timedata.nyears,)+(EHF.shape[1],)))*fillval
+    HWA = np.ones(((timedata.nyears,)+(EHF.shape[1],)))*const.FILL_VAL
     HWM = HWA.copy()
     HWN = HWA.copy()
     HWF = HWA.copy()
     HWD = HWA.copy()
     HWT = HWA.copy()
     # Loop over years
-    for iyear, year in enumerate(range(timedata.first_year,timedata.daylast.year)):
+    for iyear, year in enumerate(range(timedata.first_year, timedata.daylast.year)):
         if options.oldmethod:
             if (year==timedata.daylast.year): continue # Incomplete yr
             # Select this years season
@@ -192,7 +217,7 @@ def hw_aspects(EHF, season, hemisphere):
         HWN[iyear,...] = (duration_i>0).sum(axis=0)
         HWF[iyear,...] = duration_i.sum(axis=0)
         HWD[iyear,...] = duration_i.max(axis=0)
-        HWT[iyear,...] = np.argmax(event_i,axis=0)
+        HWT[iyear,...] = np.argmax(event_i, axis=0)
         # HWM and HWA must be done on each gridcell
         for x in range(EHF_i.shape[1]):
             hw_mag = []
@@ -212,30 +237,41 @@ def hw_aspects(EHF, season, hemisphere):
         # Locate invalid values or misisng values
         missing = EHF_i.mask.all(axis=0)
         if missing.any():
-            HWT[iyear,missing] = missingval
-            HWN[iyear,missing] = missingval
-            HWF[iyear,missing] = missingval
-            HWD[iyear,missing] = missingval
-            HWA[iyear,missing] = missingval
-            HWM[iyear,missing] = missingval
+            HWT[iyear,missing] = const.MISSING_VAL
+            HWN[iyear,missing] = const.MISSING_VAL
+            HWF[iyear,missing] = const.MISSING_VAL
+            HWD[iyear,missing] = const.MISSING_VAL
+            HWA[iyear,missing] = const.MISSING_VAL
+            HWM[iyear,missing] = const.MISSING_VAL
         invalid = HWN[iyear,...]==0
-        HWT[iyear,invalid] = invalidval
-        HWD[iyear,invalid] = invalidval
-        HWA[iyear,invalid] = invalidval
-        HWM[iyear,invalid] = invalidval
+        HWT[iyear,invalid] = const.INVALID_VAL
+        HWD[iyear,invalid] = const.INVALID_VAL
+        HWA[iyear,invalid] = const.INVALID_VAL
+        HWM[iyear,invalid] = const.INVALID_VAL
     return HWA, HWM, HWN, HWF, HWD, HWT
 
 
 # Calculate metrics year by year
 def split_hemispheres(EHF, north, south):
-    """split_hemispheres splits the input data by hemispheres, and glues them
-    back together after heatwave calculations.
+    """Split the input data by hemispheres, and glue them back together after heatwave
+    calculations.
 
     The EHF spatial axes are reshaped into a single dimension.
-    The output arrays are 2D. When saving, data should be reshaped or indexed
-    with a land-sea mask.
+    The output arrays are 2D. When saving, data should be reshaped or indexed with a land-sea mask.
+
+    Arguments:
+    EHF -- EHF values.
+    north -- Calculate heatwaves for the northern hemisphere.
+    south -- Calculate heatwaves for the southern hemisphere.
+
+    Returns
+    HWA -- Amplitude
+    HWM -- Magnitude
+    HWN -- Number
+    HWF -- Frequency
+    HWD -- Maximum duration
+    HWT -- Timing
     """
-    from ehfheatwaves.getoptions import options
     lats = grid.lats
     if south:
         if options.maskfile:
@@ -245,10 +281,9 @@ def split_hemispheres(EHF, north, south):
         # Reshape to 2D
         space = EHF_s.shape[1:]
         if len(space)>1:
-            EHF_s = EHF_s.reshape(EHF_s.shape[0],space[0]*space[1])
+            EHF_s = EHF_s.reshape(EHF_s.shape[0], space[0]*space[1])
         # Southern hemisphere aspects
-        HWA_s, HWM_s, HWN_s, HWF_s, HWD_s, HWT_s = \
-                hw_aspects(EHF_s, options.season, 'south')
+        HWA_s, HWM_s, HWN_s, HWF_s, HWD_s, HWT_s = hw_aspects(EHF_s, options.season, 'south')
         del EHF_s
     if north:
         if options.maskfile:
@@ -260,8 +295,7 @@ def split_hemispheres(EHF, north, south):
         if len(space)>1:
             EHF_n = EHF_n.reshape(EHF_n.shape[0],space[0]*space[1])
         # Northern hemisphere aspects
-        HWA_n, HWM_n, HWN_n, HWF_n, HWD_n, HWT_n = \
-                hw_aspects(EHF_n, options.season, 'north')
+        HWA_n, HWM_n, HWN_n, HWF_n, HWD_n, HWT_n = hw_aspects(EHF_n, options.season, 'north')
         del EHF_n
     # Glue hemispheres back together
     if north and south:
@@ -297,10 +331,9 @@ def main():
     This function parses the cammand line arguments and options then calculates the heatwaves and
     saves them to netcdf files.
     """
-    global grid, timedata, mask
+    global grid, timedata, mask, options
     # Get the options and variables
-    getoptions.options = getoptions.parse_arguments(sys.argv[1:])
-    options = getoptions.options
+    options = getoptions.parse_arguments(sys.argv[1:])
 
     # Load time data
     if options.verbose: print("Loading data")
@@ -321,11 +354,11 @@ def main():
     # Caclulate percentile
     if options.verbose: print("Calculating percentiles")
     if options.keeptave:
-        tpct = window_percentile(tave_base, options, daysinyear=timedata.daysinyear)
+        tpct = window_percentile(tave_base, daysinyear=timedata.daysinyear)
     if options.keeptmax:
-        txpct = window_percentile(tmax, options, daysinyear=timedata.daysinyear)
+        txpct = window_percentile(tmax, daysinyear=timedata.daysinyear)
     if options.keeptmin:
-        tnpct = window_percentile(tmin, options, daysinyear=timedata.daysinyear)
+        tnpct = window_percentile(tmin, daysinyear=timedata.daysinyear)
     if not options.noehf: del tave_base
 
     # Load all data
@@ -380,29 +413,29 @@ def main():
     # Calculate EHF
     if not options.noehf:
         EHF = np.ma.ones(tave.shape)*np.nan
-        for i in range(32,tave.shape[0]):
-            EHIaccl = tave[i-2:i+1,...].sum(axis=0)/3. - tave[i-32:i-2,...].sum(axis=0)/30.
-            EHIsig = tave[i-2:i+1,...].sum(axis=0)/3. - tpct[i-timedata.daysinyear*int((i+1)/timedata.daysinyear),...]
-            EHF[i,...] = np.ma.maximum(EHIaccl,1.)*EHIsig
+        for i in range(32, tave.shape[0]):
+            EHIaccl = tave[i-2:i+1,...].sum(axis=0)/3.0 - tave[i-32:i-2,...].sum(axis=0)/30.0
+            EHIsig = tave[i-2:i+1,...].sum(axis=0)/3.0 - tpct[i-timedata.daysinyear*int((i+1)/timedata.daysinyear),...]
+            EHF[i,...] = np.ma.maximum(EHIaccl, 1.0)*EHIsig
         EHF[EHF<0] = 0
     if options.ehi:
         EHIaccl = np.ma.ones(tave.shape)*np.nan
         EHIsig = np.ma.ones(tave.shape)*np.nan
-        for i in range(32,tave.shape[0]):
-            EHIaccl[i,...] = tave[i-2:i+1,...].sum(axis=0)/3. - tave[i-32:i-2,...].sum(axis=0)/30.
-            EHIsig[i,...] = tave[i-2:i+1,...].sum(axis=0)/3. - tpct[i-timedata.daysinyear*int((i+1)/timedata.daysinyear),...]
+        for i in range(32, tave.shape[0]):
+            EHIaccl[i,...] = tave[i-2:i+1,...].sum(axis=0)/3.0 - tave[i-32:i-2,...].sum(axis=0)/30.0
+            EHIsig[i,...] = tave[i-2:i+1,...].sum(axis=0)/3.0 - tpct[i-timedata.daysinyear*int((i+1)/timedata.daysinyear),...]
 
     # Tx90pc exceedences
     if options.keeptmin or options.keeptmax:
         if options.keeptmax:
             txexceed = np.ma.ones(tmax.shape)*np.nan
-            for i in range(0,tmax.shape[0]):
+            for i in range(0, tmax.shape[0]):
                 idoy = i-timedata.daysinyear*int((i+1)/timedata.daysinyear)
                 txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
             txexceed[txexceed>0] = tmax[txexceed>0]
         if options.keeptmin:
             tnexceed = np.ma.ones(tmin.shape)*np.nan
-            for i in range(0,tmin.shape[0]):
+            for i in range(0, tmin.shape[0]):
                 idoy = i-timedata.daysinyear*int((i+1)/timedata.daysinyear)
                 tnexceed[i,...] = tmin[i,...]>tnpct[idoy,...]
             tnexceed[tnexceed>0] = tmin[tnexceed>0]
@@ -412,7 +445,7 @@ def main():
     if options.tx90pcd: event_tx, ends_tx = identify_hw(txexceed)
     if options.tn90pcd: event_tn, ends_tn = identify_hw(tnexceed)
 
-    timedata.nyears = len(range(timedata.first_year,timedata.daylast.year+1))
+    timedata.nyears = len(range(timedata.first_year, timedata.daylast.year + 1))
 
     # Calculate yearly output
     if options.yearlyout:
@@ -421,33 +454,105 @@ def main():
         north = (grid.lats>0).any()
         south = (grid.lats<=0).any()
         if not options.noehf:
-            HWA_EHF, HWM_EHF, HWN_EHF, HWF_EHF, HWD_EHF, HWT_EHF = split_hemispheres(EHF, north,
-                    south)
+            HWA_EHF, HWM_EHF, HWN_EHF, HWF_EHF, HWD_EHF, HWT_EHF = split_hemispheres(
+                    EHF,
+                    north,
+                    south,
+                    )
         if options.tx90pc:
-            HWA_tx, HWM_tx, HWN_tx, HWF_tx, HWD_tx, HWT_tx = split_hemispheres(txexceed, north,
-                    south)
+            HWA_tx, HWM_tx, HWN_tx, HWF_tx, HWD_tx, HWT_tx = split_hemispheres(
+                    txexceed,
+                    north,
+                    south,
+                    )
         if options.tn90pc:
-            HWA_tn, HWM_tn, HWN_tn, HWF_tn, HWD_tn, HWT_tn = split_hemispheres(tnexceed, north,
-                    south)
+            HWA_tn, HWM_tn, HWN_tn, HWF_tn, HWD_tn, HWT_tn = split_hemispheres(
+                    tnexceed,
+                    north,
+                    south,
+                    )
 
     if options.verbose: print("Saving")
     # Save yearly data to netcdf
     if options.yearlyout:
         if not options.noehf:
-            ncio.save_yearly(HWA_EHF,HWM_EHF,HWN_EHF,HWF_EHF,HWD_EHF,HWT_EHF,tpct,"EHF",timedata,options,mask)
+            ncio.save_yearly(
+                    HWA_EHF,
+                    HWM_EHF,
+                    HWN_EHF,
+                    HWF_EHF,
+                    HWD_EHF,
+                    HWT_EHF,
+                    tpct,
+                    "EHF",
+                    timedata,
+                    options,
+                    mask,
+                    )
         if options.tx90pc:
-            ncio.save_yearly(HWA_tx,HWM_tx,HWN_tx,HWF_tx,HWD_tx,HWT_tx,txpct,"tx90pct",timedata,options,mask)
+            ncio.save_yearly(
+                    HWA_tx,
+                    HWM_tx,
+                    HWN_tx,
+                    HWF_tx,
+                    HWD_tx,
+                    HWT_tx,
+                    txpct,
+                    "tx90pct",
+                    timedata,
+                    options,
+                    mask,
+                    )
         if options.tn90pc:
-            ncio.save_yearly(HWA_tn,HWM_tn,HWN_tn,HWF_tn,HWD_tn,HWT_tn,tnpct,"tn90pct",timedata,options,mask)
+            ncio.save_yearly(
+                    HWA_tn,
+                    HWM_tn,
+                    HWN_tn,
+                    HWF_tn,
+                    HWD_tn,
+                    HWT_tn,
+                    tnpct,
+                    "tn90pct",
+                    timedata,
+                    options,
+                    mask,
+                    )
 
     # Save daily data to netcdf
     if options.dailyout:
         if options.keeptave:
-            ncio.save_daily(EHF, event, ends, options, timedata, original_shape, mask, defn='EHF')
+            ncio.save_daily(
+                    EHF,
+                    event,
+                    ends,
+                    options,
+                    timedata,
+                    original_shape,
+                    mask,
+                    defn='EHF',
+                    )
         if options.tx90pcd:
-            ncio.save_daily(txexceed, event_tx, ends_tx, options, timedata, original_shape, mask, defn='tx90pct')
+            ncio.save_daily(
+                    txexceed,
+                    event_tx,
+                    ends_tx,
+                    options,
+                    timedata,
+                    original_shape,
+                    mask,
+                    defn='tx90pct',
+                    )
         if options.tn90pcd:
-            ncio.save_daily(tnexceed, event_tn, ends_tn, options, timedata, original_shape, mask, defn='tn90pct')
+            ncio.save_daily(
+                    tnexceed,
+                    event_tn,
+                    ends_tn,
+                    options,
+                    timedata,
+                    original_shape,
+                    mask,
+                    defn='tn90pct',
+                    )
 
     # save EHIs
     if options.ehi:

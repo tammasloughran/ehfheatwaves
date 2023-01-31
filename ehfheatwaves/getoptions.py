@@ -14,19 +14,25 @@ options = None
 
 
 class NoTmaxTminFileError(Exception):
-    """Exception to be raised when no input data files are provided"""
+    """Exception to be raised when no input data files are provided.
+    """
+
     def __init__(self):
         print("Please specify tmax and tmin files.")
 
 
 class InvalidBPFormatError(Exception):
-    """Exception to be raised if the base period is not format is not ????-????"""
+    """Exception to be raised if the base period is not format is not ????-????
+    """
+
     def __init__(self, baseperiod):
         print("The provided base period (", baseperiod, ")  must be formatted ????-????)")
 
 
 class InvalidSeasonError(Exception):
-    """Exception to be raised when the  given season is not summer or winter."""
+    """Exception to be raised when the  given season is not summer or winter.
+    """
+
     def __init__(self, season):
         print("The provided season much be either winter or summer. You specified ", season)
 
@@ -63,6 +69,7 @@ def parse_arguments(arguments):
     parser.add_option('--flip-mask', action='store_true', dest='flipmask', help='Flip the mask upside down by latitude.')
 
     # Parse command line arguments to the options object
+    global options
     options, args = parser.parse_args(arguments)
 
     # Handle errors and warnings
