@@ -20,7 +20,6 @@ class GridDescription(object):
 
 
 grid = GridDescription()
-timedata = ncio.TimeData()
 
 
 def window_percentile(temp, daysinyear=365, wsize=15):
@@ -337,7 +336,11 @@ def main():
 
     # Load time data
     if options.verbose: print("Loading data")
-    timedata = ncio.get_time_data(options)
+    if options.tmaxfile:
+        filename = options.tmaxfile
+    elif options.tminfile:
+        filename = options.tminfile
+    timedata = ncio.TimeData(filename, options.timevname)
 
     # Load land-sea mask
     if options.maskfile: mask = ncio.get_mask(options)

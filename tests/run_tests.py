@@ -313,12 +313,12 @@ class TestNCIO(unittest.TestCase):
             '-n', 'climpact2.sampledata.gridded.1991-2010.nc',
             '--vnamex=tmax', '--vnamen=tmin', '--base=1991-2010', '-v']
     options = getoptions.parse_arguments(args)
-    timedata = ncio.get_time_data(options)
+    timedata = ncio.TimeData('climpact2.sampledata.gridded.1991-2010.nc', options.timevname)
 
     def testTimeData(self):
         """Should return a TimeData class"""
-        self.assertIs(type(ncio.get_time_data(self.options)), ncio.TimeData)
-        timedata = ncio.get_time_data(self.options)
+        self.assertIs(type(ncio.TimeData(self.options.tmaxfile, self.options.timevname)), ncio.TimeData)
+        timedata = ncio.TimeData(self.options.tminfile, self.options.timevname)
         print(timedata.calendar)
         self.assertTrue(timedata.calendar in ['standard', '360_day', 'gregorian', 'proleptic_gregorian', '365_day'])
         import cftime

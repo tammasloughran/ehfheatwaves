@@ -58,60 +58,48 @@ class TimeData(object):
     """A class to contain all of the time data from an netcdf file."""
 
 
-def get_time_data(options):
-    """This function fetches the time and calendar data from the input netcdf files.
-
-    The argument is the options object, which contains the tmaxfile filename.
-
-    Returns a TimeData object containing a collection of variables.
-    """
-    timedata = TimeData()
-    if options.tmaxfile:
-        filename = options.tmaxfile
-    elif options.tminfile:
-        filename = options.tminfile
-    if any([(wildcard in filename) for wildcard in ['*','?','[']]):
-        tempnc = nc.MFDataset(filename, 'r')
-        nctime = tempnc.variables[options.timevname]
-        nctime = nc.MFTime(nctime)
-    else:
-        tempnc = nc.Dataset(filename, 'r')
-        nctime = tempnc.variables[options.timevname]
-    try:
-        timedata.calendar = nctime.calendar
-    except:
-        timedata.calendar = 'proleptic_gregorian'
-
-    if not timedata.calendar:
-        print('Unrecognized calendar. Using gregorian.')
-        timedata.calendar = 'gregorian'
-
-    if timedata.calendar=='360_day':
-        timedata.daysinyear = 360
-        # 360 day season start and end indices
-        timedata.SHS = (300,450)
-        timedata.SHW = (120,270)
-        timedata.dayone = nc.num2date(nctime[0], nctime.units, calendar=timedata.calendar)
-        timedata.daylast = nc.num2date(nctime[-1], nctime.units, calendar=timedata.calendar)
-        timedata.dates = Calendar360(timedata.dayone, timedata.daylast)
-    else:
-        timedata.daysinyear = 365
-        # 365 day season start and end indices
-        timedata.SHS = (304,455)
-        timedata.SHW = (120,273)
-        if tempnc.variables[options.timevname].units=='day as %Y%m%d.%f':
-            st = str(int(nctime[0]))
-            nd = str(int(nctime[-1]))
-            timedata.dayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
-            timedata.daylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(nd[6:]))
+    def __init__(self, filename, timevname):
+        """This function fetches the time and calendar data from the input netcdf files."""
+        if any([(wildcard in filename) for wildcard in ['*','?','[']]):
+            tempnc = nc.MFDataset(filename, 'r')
+            nctime = tempnc.variables[timevname]
+            nctime = nc.MFTime(nctime)
         else:
-            timedata.dayone = nc.num2date(nctime[0], nctime.units, calendar=timedata.calendar)
-            timedata.daylast = nc.num2date(nctime[-1], nctime.units, calendar=timedata.calendar)
-        timedata.dates = pd.period_range(str(timedata.dayone), str(timedata.daylast))
-        # Remove leap days. Maybe this should be a separate function?
-        timedata.noleapdates = timedata.dates[(timedata.dates.month!=2)|(timedata.dates.day!=29)]
+            tempnc = nc.Dataset(filename, 'r')
+            nctime = tempnc.variables[timevname]
 
-    return timedata
+        try:
+            self.calendar = nctime.calendar
+        except:
+            self.calendar = 'proleptic_gregorian'
+        if not self.calendar:
+            print('Unrecognized calendar. Using gregorian.')
+            self.calendar = 'gregorian'
+
+        if self.calendar=='360_day':
+            self.daysinyear = 360
+            # 360 day season start and end indices
+            self.SHS = (300,450)
+            self.SHW = (120,270)
+            self.dayone = nc.num2date(nctime[0], nctime.units, calendar=self.calendar)
+            self.daylast = nc.num2date(nctime[-1], nctime.units, calendar=self.calendar)
+            self.dates = Calendar360(self.dayone, self.daylast)
+        else:
+            self.daysinyear = 365
+            # 365 day season start and end indices
+            self.SHS = (304,455)
+            self.SHW = (120,273)
+            if tempnc.variables[timevname].units=='day as %Y%m%d.%f':
+                st = str(int(nctime[0]))
+                nd = str(int(nctime[-1]))
+                self.dayone = dt.datetime(int(st[:4]), int(st[4:6]), int(st[6:]))
+                self.daylast = dt.datetime(int(nd[:4]), int(nd[4:6]), int(nd[6:]))
+            else:
+                self.dayone = nc.num2date(nctime[0], nctime.units, calendar=self.calendar)
+                self.daylast = nc.num2date(nctime[-1], nctime.units, calendar=self.calendar)
+            self.dates = pd.period_range(str(self.dayone), str(self.daylast))
+            # Remove leap days. Maybe this should be a separate function?
+            self.noleapdates = self.dates[(self.dates.month!=2)|(self.dates.day!=29)]
 
 
 def get_mask(options):
