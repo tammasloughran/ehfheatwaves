@@ -16,10 +16,11 @@ warnings.simplefilter('ignore', category=RuntimeWarning)
 
 
 class GridDescription(object):
-    lats = np.array([])
+    """Description of grid
+    """
 
-
-grid = GridDescription()
+    def __init__(self, lats=np.array([])):
+        self.lats = lats
 
 
 def window_percentile(temp, daysinyear=365, wsize=15):
@@ -341,6 +342,7 @@ def main():
     elif options.tminfile:
         filename = options.tminfile
     timedata = ncio.TimeData(filename, options.timevname)
+    grid = GridDescription()
 
     # Load land-sea mask
     if options.maskfile: mask = ncio.get_mask(options)
