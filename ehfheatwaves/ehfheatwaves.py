@@ -1,35 +1,49 @@
 # -*- coding: utf-8 -*-
-"""Calculate heatwave indices and characteristics from temperature data.
+"""Main heatwave calculation module. The main program routine is executed from this module.
 
-@author: Tammas Loughran
+The procedure is:
+
+- parse arguments
+- load the base period data
+- calculate the percentile thresholds
+- load the remaining data
+- calculate heatwave indices
+- calculate seasonal characteristics for each hemisphere and join them back together
+- save to netCDF files.
 """
 import sys
 import warnings
+
 import numpy as np
-import ehfheatwaves.getoptions as getoptions
-import ehfheatwaves.qtiler as qtiler
-import ehfheatwaves.ncio as ncio
+
 import ehfheatwaves.constants as const
+import ehfheatwaves.getoptions as getoptions
+import ehfheatwaves.ncio as ncio
+import ehfheatwaves.qtiler as qtiler
 from ehfheatwaves.getoptions import options
 
 warnings.simplefilter('ignore', category=RuntimeWarning)
 
 
 class GridDescription(object):
-    """Description of grid
-    """
+    """Description of grid."""
 
     def __init__(self, lats=np.array([])):
+        """## Arguments:
+
+        - lats : Latitudes.
+        """
         self.lats = lats
 
 
-def window_percentile(temp, daysinyear=365, wsize=15):
+def window_percentile(temp:np.ndarray, daysinyear:int=365, wsize:int=15)->np.ndarray:
     """Calculate a day-of-year moving window percentile.
 
-    Arguments:
-    temp -- Temperature data.
-    daysinyear -- Number of days in a year.
-    wsize -- Number of days in moving window.
+    ## Arguments:
+
+    - temp : Temperature data.
+    - daysinyear : Number of days in a year.
+    - wsize : Number of days in moving window.
     """
     # Initialise array.
     pctl = np.ones(((daysinyear,)+temp.shape[1:]))*const.FILL_VAL
@@ -65,15 +79,16 @@ def window_percentile(temp, daysinyear=365, wsize=15):
     return pctl
 
 
-def identify_hw(ehfs):
+def identify_hw(ehfs:np.ndarray)->tuple:
     """Locate heatwaves from EHF and returns an event indicator and a duration indicator.
 
-    Arguments:
-    ehfs -- EHF values.
+    ## Arguments:
 
-    Returns
-    events -- array of bools for heatwave events.
-    endss -- array of integers for heatwave duration.
+    - ehfs : EHF values.
+
+    ## Returns:
+    - events : array of bools for heatwave events.
+    - endss : array of integers for heatwave duration.
     """
     # Agregate consecutive days with EHF>0
     # First day contains duration
@@ -103,16 +118,18 @@ def identify_hw(ehfs):
     return events, endss
 
 
-def identify_semi_hw(ehfs):
+def identify_semi_hw(ehfs:np.ndarray)->tuple:
     """identify_hw locates heatwaves from EHF and returns an event indicator and a duration
     indicator. This function does not exclude events less than three days in duration.
 
-    Arguments:
-    ehfs -- EHF values.
+    ## Arguments:
 
-    Returns
-    events -- array of bools for heatwave events.
-    endss -- array of integers for heatwave duration.
+    - ehfs : EHF values.
+
+    ## Returns:
+
+    - events : array of bools for heatwave events.
+    - endss -- array of integers for heatwave duration.
     """
     # Agregate consecutive days with EHF>0
     # First day contains duration
@@ -136,21 +153,23 @@ def identify_semi_hw(ehfs):
     return events, endss
 
 
-def hw_aspects(EHF, season, hemisphere):
-    """Call `identify_hw` and calculate seasonal aspects.
+def hw_aspects(EHF:np.ndarray, season:str, hemisphere:str)->tuple:
+    """Call `identify_hw` and/or `identify_semi_hw` and calculate seasonal aspects.
 
-    Arguments:
-    EHF -- EHF values.
-    season -- The season in which to calculate aspects for.
-    hemisphere -- The hemisphere to calculate heatwaves for.
+    ## Arguments:
 
-    Returns
-    HWA -- Amplitude
-    HWM -- Magnitude
-    HWN -- Number
-    HWF -- Frequency
-    HWD -- Maximum duration
-    HWT -- Timing
+    - EHF : EHF values.
+    - season : The season in which to calculate aspects for.
+    - hemisphere : The hemisphere to calculate heatwaves for.
+
+    ## Returns:
+
+    - HWA : Amplitude
+    - HWM : Magnitude
+    - HWN : Number
+    - HWF : Frequency
+    - HWD : Maximum duration
+    - HWT : Timing
     """
     global timedata
     # Select indices depending on calendar season and hemisphere
@@ -252,25 +271,27 @@ def hw_aspects(EHF, season, hemisphere):
 
 
 # Calculate metrics year by year
-def split_hemispheres(EHF, north, south):
+def split_hemispheres(EHF:np.ndarray, north:bool, south:bool)->tuple:
     """Split the input data by hemispheres, and glue them back together after heatwave
     calculations.
 
     The EHF spatial axes are reshaped into a single dimension.
     The output arrays are 2D. When saving, data should be reshaped or indexed with a land-sea mask.
 
-    Arguments:
-    EHF -- EHF values.
-    north -- Calculate heatwaves for the northern hemisphere.
-    south -- Calculate heatwaves for the southern hemisphere.
+    ## Arguments:
 
-    Returns
-    HWA -- Amplitude
-    HWM -- Magnitude
-    HWN -- Number
-    HWF -- Frequency
-    HWD -- Maximum duration
-    HWT -- Timing
+    - EHF : EHF values.
+    - north : Calculate heatwaves for the northern hemisphere.
+    - south : Calculate heatwaves for the southern hemisphere.
+
+    ## Returns:
+
+    - HWA : Amplitude
+    - HWM : Magnitude
+    - HWN : Number
+    - HWF : Frequency
+    - HWD : Maximum duration
+    - HWT : Timing
     """
     lats = grid.lats
     if south:
@@ -328,7 +349,7 @@ def main():
     See the following documentation for more information on entry points.
     https://setuptools.pypa.io/en/latest/userguide/entry_point.html?highlight=entry
 
-    This function parses the cammand line arguments and options then calculates the heatwaves and
+    This function parses the command line arguments and options then calculates the heatwaves and
     saves them to netcdf files.
     """
     global grid, timedata, mask, options

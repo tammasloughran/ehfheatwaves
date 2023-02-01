@@ -6,13 +6,15 @@ Created on Sat Apr 14 12:56:42 2018
 
 @author: Tammas Loughran
 """
-import sys
 import datetime as dt
+import sys
+
 import netCDF4 as nc
-import pandas as pd
 import numpy as np
-from ehfheatwaves.__init__ import __version__
+import pandas as pd
+
 import ehfheatwaves.constants as const
+from ehfheatwaves.__init__ import __version__
 
 LAT_NAMES = ('lat','lats','latitude','latitudes')
 LON_NAMES = ('lon','lons','longitude','longitudes')
@@ -30,36 +32,45 @@ class DatesOrderError(Exception):
 
 
 class Calendar360():
-    """A basic calendar object with 360 days per year."""
+    """A basic calendar class with 360 days per year."""
 
-    def __init__(self,sdate,edate):
-        if sdate>edate: raise DatesOrderError(sdate,edate)
-        self.year = np.repeat(range(sdate.year,edate.year+1), 360, 0)
-        nyears = len(range(sdate.year,edate.year+1))
-        self.month = np.tile(np.repeat(range(1,12+1), 30, 0), nyears)
-        self.day = np.tile(np.tile(range(1,30+1), 12), nyears)
+    def __init__(self, sdate, edate):
+        """## Arguments:
+
+        - sdate : Start date of calendar.
+        - edate : End date of calendar.
+        """
+        if sdate>edate: raise DatesOrderError(sdate, edate)
+        self.year = np.repeat(range(sdate.year, edate.year+1), 360, 0)
+        nyears = len(range(sdate.year, edate.year+1))
+        self.month = np.tile(np.repeat(range(1, 12+1), 30, 0), nyears)
+        self.day = np.tile(np.tile(range(1, 30+1), 12), nyears)
         if (sdate.day!=1)|(edate.month!=1):
-            sdoyi = (sdate.month-1)*30+sdate.day-1
+            sdoyi = (sdate.month - 1)*30 + sdate.day - 1
             self.year = self.year[sdoyi:]
             self.month = self.month[sdoyi:]
             self.day = self.day[sdoyi:]
         if (edate.day!=30)|(edate.month!=12):
-            edoyi = (12-edate.month)*30+(30-edate.day)
+            edoyi = (12 - edate.month)*30 + (30 - edate.day)
             self.year = self.year[:-edoyi]
             self.month = self.month[:-edoyi]
             self.day = self.day[:-edoyi]
 
-    def __getitem__(self,i):
-        """Return a datetime object for the provided index"""
+    def __getitem__(self, i):
+        """Return a datetime object for the provided index."""
         return dt.datetime(self.year[i], self.month[i], self.day[i])
 
 
 class TimeData(object):
-    """A class to contain all of the time data from an netcdf file."""
+    """Data class for time data from an netcdf file."""
 
 
-    def __init__(self, filename, timevname):
-        """This function fetches the time and calendar data from the input netcdf files."""
+    def __init__(self, filename:str, timevname:str):
+        """## Arguments:
+
+        - filename : Input file name.
+        - timevarname : Name of the time variable in the input file.
+        """
         if any([(wildcard in filename) for wildcard in ['*','?','[']]):
             tempnc = nc.MFDataset(filename, 'r')
             nctime = tempnc.variables[timevname]
@@ -102,13 +113,13 @@ class TimeData(object):
             self.noleapdates = self.dates[(self.dates.month!=2)|(self.dates.day!=29)]
 
 
-def get_mask(options):
+def get_mask(options)->np.ndarray:
     """get_mask loads the land-sea mask data from a NetCDF4 file."""
     masknc = nc.Dataset(options.maskfile, 'r')
     mask = masknc.variables[options.maskvname][:]
     if mask.max()>1: mask = mask>50
     else: mask = mask>0.5
-    mask = mask.astype(np.bool)
+    mask = mask.astype(bool)
     mask = np.squeeze(mask)
     masknc.close()
     if options.invertmask: mask = np.logical_not(mask)
@@ -116,8 +127,20 @@ def get_mask(options):
     return mask
 
 
-def load_bp_data(options, timedata, variable='tmax', mask=None):
-    """load_bp_data loads the tmax or tmin data for the baseperiod provided in options."""
+def load_bp_data(options, timedata:TimeData, variable:str='tmax', mask:np.ndarray=None)->np.ndarray:
+    """Load the tmax or tmin data for the base period.
+
+    ## Arguments:
+
+    - options
+    - timedata : `TimeData` object.
+    - variable : The variable to load.
+    - mask : The land-sea mask.
+
+    ## Returns:
+
+    - temp : Temperature data array.
+    """
     # Determine if we need tmax or tmin and whether the data are in multiple files.
     if variable=='tmax':
         if options.bpfx:files = options.bpfx
@@ -177,17 +200,24 @@ def load_bp_data(options, timedata, variable='tmax', mask=None):
     return temp
 
 
-def remove_leap_days(data, dates):
-    """remove_leap_days removes February 29th from a dataset"""
+def remove_leap_days(data:np.ndarray, dates:pd.DatetimeIndex)->np.ndarray:
+    """Remove February 29th from a dataset."""
     return data[(dates.month!=2)|(dates.day!=29),...]
 
 
-def get_all_data(files, vname, options):
-    """get_all_data loads all temperature data from a netcdf file.
+def get_all_data(files:str, vname:str, options)->tuple:
+    """Load all temperature data from a netcdf file.
 
-    Returns
-    temp - data in (time, x, y) coordinates.
-    lats - latitudes
+    ## Arguments:
+
+    - files : filename, may contain wildcards.
+    - vname : variable name.
+    - options
+
+    ## Returns:
+
+    - temp : data in (time, x, y) coordinates.
+    - lats : latitudes
     """
     if any([(wildcard in files) for wildcard in ['*','?','[']]):
         tempnc = nc.MFDataset(files, 'r')
@@ -205,10 +235,36 @@ def get_all_data(files, vname, options):
     return temp, lats
 
 
-def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
+def save_yearly(
+            HWA,
+            HWM,
+            HWN,
+            HWF,
+            HWD,
+            HWT,
+            tpct,
+            definition:str,
+            timedata,
+            options,
+            mask:np.ndarray,
+            )->None:
     """Save yearly data to netcdf file.
-    Input aspect arrays are 2D, timeXspace and are either reshaped or indexed
-    with a land-sea mask
+
+    Input aspect arrays are 2D, timeXspace and are either reshaped or indexed with a land-sea mask.
+
+    ## Arguments:
+
+    - HWA :
+    - HWM :
+    - HWN :
+    - HWF :
+    - HWD :
+    - HWT :
+    - txpct : Percentile thresholds.
+    - definition : Name of heatwave definition.
+    - timedata : TimeData onbject.
+    - options :
+    - mask : Land-sea mask.
     """
     if any([(wildcard in options.tmaxfile) for wildcard in ['*','?','[']]):
         tempnc = nc.MFDataset(options.tmaxfile, 'r')
@@ -373,10 +429,29 @@ def save_yearly(HWA,HWM,HWN,HWF,HWD,HWT,tpct,definition,timedata,options,mask):
     yearlyout.close()
 
 
-def save_daily(exceed, event, ends, options, timedata, original_shape, mask, defn='EHF'):
-    """save_daily saves the daily data to netcdf file.
-    Input arrays are 2D, timeXspace and are either reshaped or indexed
-    with a land-sea mask
+def save_daily(
+            exceed:np.ndarray,
+            event:np.ndarray,
+            ends:np.ndarray,
+            options,
+            timedata:TimeData,
+            original_shape:tuple,
+            mask:np.ndarray,
+            defn:str='EHF',
+            )->None:
+    """save_daily saves the daily data to netcdf file. Input arrays are 2D, (time, space) and are
+    either reshaped or indexed with a land-sea mask.
+
+    ## Arguments:
+
+    - exceed : Threshold exceedence values.
+    - event : Boolean indicator for whether a heatwave is occuring.
+    - ends : Duration of heatwave.
+    - options :
+    - timedata : TimeData object.
+    - original_shape : The original shape of the input data.
+    - mask : Land-sea mask.
+    - defn : The name of the heatwave definition being saved.
     """
     if options.tmaxfile:
         filename = options.tmaxfile
@@ -487,10 +562,25 @@ def save_daily(exceed, event, ends, options, timedata, original_shape, mask, def
     dailyout.close()
 
 
-def save_ehi(EHIsig, EHIaccl, options, timedata, original_shape, mask):
-    """save_ehi saves the daily data to netcdf file.
-    Input arrays are 2D, timeXspace and are either reshaped or indexed
-    with a land-sea mask
+def save_ehi(
+            EHIsig:np.ndarray,
+            EHIaccl:np.ndarray,
+            options,
+            timedata:TimeData,
+            original_shape:tuple,
+            mask:np.ndarray,
+            )->None:
+    """Save the daily data to netcdf file. Input arrays are 2D, (time, space) and are either
+    reshaped or indexed with a land-sea mask.
+
+    ## Arguments:
+
+    - EHIsig : EHI significance index.
+    - EHIaccl : EHI acclimatisation index.
+    - options :
+    - timedata : TimeData object.
+    - original_shape : The original shape of the input data.
+    - mask : Land-sea mask.
     """
     if options.tmaxfile:
         filename = options.tmaxfile
