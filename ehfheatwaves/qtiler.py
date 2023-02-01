@@ -1,8 +1,7 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 """
-qtiler.py module contains functions that calculate quantiles using various
-interpolation methods.
+Contains functions that calculate quantiles using various interpolation methods.
 
 @author: Tammas Loughran
 """
@@ -29,7 +28,7 @@ def quantile_R(
     """Quantile function used in R.
 
     Calculates quantiles in the same way as the quantile function in R.
-    There are nine interpolation methods. type 1-3 are discrete methods and
+    There are nine interpolation methods. Type 1-3 are discrete methods and
     4-9 are continuous methods. 4 is a basic linear interpolation. 5 is the
     default method used in Matlab. 7 is the default used in R and Python.
     See: Hyndman, R. J. and Fan, Y. (1996) Sample quantiles in statistical
@@ -146,17 +145,19 @@ def quantile_R(
 
 
 def quantile_zhang(y:np.ndarray, p:float, fraction:bool=False, rmnans:bool=False)->float:
-    """Caclulate the pth percentile value of an array y using the Zhang method.
+    """Caclulate the `p`th percentile value of an array `y` using the Zhang method.
 
     The linear interpolation method used is outlined in Zhang et al., 2005,
     Avoiding Inhomogeneity in Percentile-Based Indices of Temperature Extremes,
-    Journal of Climate, vol. 18. The interpolation is given as:
+    Journal of Climate, vol. 18.
 
-    $$ Qp =  (1 - f)*y_j + f*y_j + 1 $$
+    The interpolation is given as:
 
-    $p<1/(n+1)$ are set to the smallest value in y
+    $$ Q_p =  (1 - f)*y_j + f*y_j + 1 $$
 
-    $p>n/(n+1)$ are set to the largest value in y
+    $$ p<1/(n + 1) $$ are set to the smallest value in `y`.
+
+    $$ p>n/(n + 1) $$ are set to the largest value in `y`.
 
     ## Arguments:
 

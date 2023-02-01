@@ -1,5 +1,5 @@
 """
-.. include:: ./README.md
+.. include:: ./documentation.md
 """
 
 from ehfheatwaves.ehfheatwaves import *

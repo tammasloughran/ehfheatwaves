@@ -10,6 +10,20 @@ The procedure is:
 - calculate heatwave indices
 - calculate seasonal characteristics for each hemisphere and join them back together
 - save to netCDF files.
+
+The EHF Index is defined from Nairn et al., (2009) and Nairn and Fawcett, (2013).
+
+$$ EHI_{sig} = \\frac{(T_i + T_{i-1} + T_{i-2})}{3} - T_{90} $$
+
+$$ EHI_{accl} = \\frac{(T_i + T_{i-1} + T_{i-2})}{3} - \\frac{(T_i + ... + T_{-30})}{30} $$
+
+$$ EHF = EHI_{sig} \cdot max(1, EHI_{accl}) $$
+
+Nairn J, Fawcett R. 2013. Defining heatwaves: heatwave defined as a heat-impact event servicing
+all community and business sectors in Australia. CAWCR Tech. Rep. 60: 10–15.
+
+Nairn J, Fawcett R, Ray D. 2009. Defining and predicting excessive heat events, a national system.
+CAWCR Tech. Rep. 60: 83–86.
 """
 import sys
 import warnings
