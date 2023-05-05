@@ -460,7 +460,7 @@ def save_daily(
     if any([(wildcard in filename) for wildcard in ['*','?','[']]):
         tempnc = nc.MFDataset(filename, 'r')
     else:
-        tempnc = Dataset(filename, 'r')
+        tempnc = nc.Dataset(filename, 'r')
     try: experiment = tempnc.__getattribute__('experiment')
     except AttributeError: experiment = ''
     try: model = tempnc.__getattribute__('model_id')
