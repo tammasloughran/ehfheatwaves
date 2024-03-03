@@ -106,8 +106,14 @@ def identify_hw(ehfs:np.ndarray)->tuple:
     """
     # Agregate consecutive days with EHF>0
     # First day contains duration
-    events = (ehfs>0.).astype(int)
-    events[events.mask==True] = 0
+    if np.isnan(ehfs).any(): # then ehfs is a view to tmax or tmin
+        # This is handled differently to EHFs because tmax or tmin could theoretically hold -ve
+        # values. Therefore we identify values of the exceedence index that are not nan values as
+        # heatwaves.
+        events = np.logical_not(np.isnan(ehfs)).astype(int)
+    else: # ehfs is a view to actual EHF values
+        events = (ehfs>0.0).astype(int)
+        events[events.mask==True] = 0
     for i in range(events.shape[0] - 2, -1, -1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
 
@@ -147,8 +153,14 @@ def identify_semi_hw(ehfs:np.ndarray)->tuple:
     """
     # Agregate consecutive days with EHF>0
     # First day contains duration
-    events = (ehfs>0.).astype(int)
-    events[events.mask==True] = 0
+    if np.isnan(ehfs).any(): # then ehfs is a view to tmax or tmin
+        # This is handled differently to EHFs because tmax or tmin could theoretically hold -ve
+        # values. Therefore we identify values of the exceedence index that are not nan values as
+        # heatwaves.
+        events = np.logical_not(np.isnan(ehfs)).astype(int)
+    else: # ehfs is a view to actual EHF values
+        events = (ehfs>0.0).astype(int)
+        events[events.mask==True] = 0
     for i in range(events.shape[0] - 2, -1, -1):
          events[i,events[i,...]>0] = events[i+1,events[i,...]>0]+1
 
@@ -473,12 +485,14 @@ def main():
                 idoy = i-timedata.daysinyear*int((i+1)/timedata.daysinyear)
                 txexceed[i,...] = tmax[i,...]>txpct[idoy,...]
             txexceed[txexceed>0] = tmax[txexceed>0]
+            txexceed[txexceed==0] = np.nan # need nans to be identified correctly
         if options.keeptmin:
             tnexceed = np.ma.ones(tmin.shape)*np.nan
             for i in range(0, tmin.shape[0]):
                 idoy = i-timedata.daysinyear*int((i+1)/timedata.daysinyear)
                 tnexceed[i,...] = tmin[i,...]>tnpct[idoy,...]
             tnexceed[tnexceed>0] = tmin[tnexceed>0]
+            tnexceed[tnexceed==0] = np.nan # need nans to be identified correctly
 
     # Calculate daily output
     if options.dailyout or options.dailyout: event, ends = identify_hw(EHF)

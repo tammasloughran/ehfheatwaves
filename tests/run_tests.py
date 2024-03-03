@@ -182,12 +182,23 @@ class TestIdentifyHW(unittest.TestCase):
     """Tests for the identify_hw function."""
 
     # Some example EHF index data
-    ehfdata = np.ma.array([-1.3, -0.3, 3.4, 8.5, -0.4, # Not a heatwave
-                        5.6, 10.2, 20.4, -1.4, # a three day heatwave starting on day 6
-                        7.8, 15.5, 16.9, 17.9, 30.2, -3.3]) # a 5 day heatwave starting on day 10
+    ehfdata = np.ma.array([
+            -1.3, -0.3, 3.4, 8.5, -0.4, # Not a heatwave
+            5.6, 10.2, 20.4, -1.4, # a three day heatwave starting on day 6
+            7.8, 15.5, 16.9, 17.9, 30.2, -3.3, # a 5 day heatwave starting on day 10
+            ])
     ehfdata[ehfdata<0] = 0
     known_events = np.ma.array([0,0,0,0,0,1,1,1,0,1,1,1,1,1,0])
     known_ends = np.ma.array([0,0,0,0,0,3,0,0,0,5,0,0,0,0,0])
+
+    # Example data for a heatwave with negative temperatures.
+    tmindata = np.ma.array([
+            np.nan,np.nan,np.nan,np.nan, # does not exceed threshold so is masked out.
+            -2.5,-1.9,-0.2,0.5,2.1, # Heatwaves with negative values.
+            np.nan,np.nan, # does not exceed threshold.
+            ])
+    tmin_known_events = np.ma.array([0,0,0,0,1,1,1,1,1,0,0])
+    tmin_known_ends = np.ma.array([0,0,0,0,5,0,0,0,0,0,0])
 
     def testReturnTupple(self):
         """Should return a tupple containging the event indicator and the durations (numpy.ndarray)."""
@@ -208,6 +219,12 @@ class TestIdentifyHW(unittest.TestCase):
         input_shape = self.ehfdata.shape
         self.assertEqual(events.shape, input_shape)
         self.assertEqual(ends.shape, input_shape)
+
+    def testNegativeTemperatures(self):
+        """Tmin or tmax exceedances with negative values should be identified correctly."""
+        events, ends = ehfheatwaves.identify_hw(self.tmindata)
+        self.assertTrue((events==self.tmin_known_events).all())
+        self.assertTrue((ends==self.tmin_known_ends).all())
 
 
 class TestIdentifySemiHW(unittest.TestCase):
