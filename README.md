@@ -5,7 +5,6 @@ A tool to calculate heatwaves from gridded daily datasets.
 
 [![DOI](https://zenodo.org/badge/41076341.svg)](https://zenodo.org/badge/latestdoi/41076341)
 
-
 The default definition of a heatwave is any hot event of at least three days
 duration where the Excess Heat Factor index is greater than 0.
 One could alternatively use the tx90pc index (Tmax greater than the 90th
@@ -18,6 +17,10 @@ The original intention of this program was to provide daily EHF values and
 heatwave indicators for any season rather than just annual or seasonal
 heatwave aspects. The script has since been expanded and improved to handle
 CMIP5 quirks (such different calendars), and use alternative heatwave indices.
+
+## API documentation
+
+http://tammasloughran.github.io/ehfheatwaves
 
 ## Installation
 
