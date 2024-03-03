@@ -37,7 +37,7 @@ jobs:
           pdoc --html --force -c latex_math=True ehfheatwaves
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: html/
+          path: html/ehfheatwaves
   deploy:
     needs: build
     runs-on: ubuntu-latest
