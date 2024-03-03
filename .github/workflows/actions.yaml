@@ -36,7 +36,8 @@ jobs:
           pip install pdoc3
           pdoc --html --force -c latex_math=True ehfheatwaves
       - uses: actions/upload-pages-artifact@v3
-        with: html/
+        with:
+          path: html/
   deploy:
     needs: build
     runs-on: ubuntu-latest
